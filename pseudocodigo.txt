@@ -1,0 +1,79 @@
+
+
+// Init: inicializar
+
+// Flowchart of SLGA algorithm
+
+Init GA: population (N), maximum iterations (Max_t)
+Init RL: Q value table, state set (S), action set (A), policy (e-greedy)
+    - Set current iteration number t = 0. Calculate the fitness of all individuals
+    - Choose a random action a_t, set a <- a_t. Calculate the State s_t of GA, set s <- s_t 
+
+While t <= Max_t do /*major loop of SLGA*/
+    Calculate the reward r_t+1 according to Eq. (10) and Eq. (11)
+
+    if conversion condition is not met // SARSA algorithm
+        Choose action a_t+1 with e-greedy
+        Update Q value according to Eq. (3)
+    else
+        Choose action a_t+1 with greedy // Q-learning algorithm
+        Update Q value according to Eq. (4)
+        Update action a_t+1 with e-greedy
+    end
+    Calculate the state s_t+1 of GA accordingto Eq. (6), Eq. (7), Eq. (8) and Eq. (9), update current s <- s_t+1
+    Update current s <- s_t+1
+    Execute action a /* Action a will take new Pc and Pm */
+    Execute genetic operation
+    t = t+1
+    Calculate the fitness of all individuals
+end
+Obtain solution
+
+
+// Eq.
+
+// where f((x_i)_t) is the fitness of the i-th individual in the t-th generation.
+
+Eq (10): r_c = ( (max(f((x_i)_t))) - (max(f((x_i)_t-1))) )/ (max(f((x_i)_t-1)))
+
+Eq (11): r_m = ( ( SUM(i=1 ... N) [(max(f((x_i)_t)))] ) - ( SUM(i=1 ... N) [(max(f((x_i)_t-1)))] ) ) / ( SUM(i=1 ... N) [(max(f((x_i)_t-1)))] )
+
+// Q(st,at) is the Q value of taking action at in current state s_t
+// alpha represents the learning rate
+// gamma is the discount rate
+// max_aQ(s_t+1, a_t+1) represents the highest expected Q value in Q value table at state s_t+1 when an action a_t+1 is executed, while Q(s_t+1,a_t+1) represents the expected Q value at state s_t+1 when the action a_t+1 which is chosen by a strategy (e.g. e-greedy strategy) is executed.
+
+Eq (3): Q(s_t, a_t) <- (1-alpha)Q(s_t, a_t) + alpha(r_t+1 + gamma * Q(s_t+1, a_t+1))
+
+Eq (4): Q(s_t, a_t) <- (1-alpha)Q(s_t, a_t) + alpha(r_t+1 + gamma * max_aQ(s_t+1, a_t+1))
+
+// f_*, d_*, m_*, S_* are variables, in multiplication will be an space and in between an *
+
+// f((x_i)_t) represents the fitness of the i-th individual in the t-th generation
+// f((x_i)_1) represents the fitness of the i-th individual in the first generation
+// f((x_j)_1) represents the fitness of the j-th individual in the first generation
+// max f((x_i)_t) means the fitness value of best individual in the t-th generation
+// w_1, w_2, w_3 are the weight values and w_1 + w_2 + w_3 = 1, which represent the relative importance of three factors
+// In this paper, the population average fitness and the population diversity reflect the whole population state, which is good for improving quality of whole population and it could be easier obtain an excellent individual. But only an outstanding individual could be relatively different to get a better individual by cross operation with other poor individuals of population
+// So, the value of w_1 and w_2 are relatively larger than w_3. In SLGA, w_1, w_2, and w_3 are set as 0.35, 0.35 and 0.3, respectively.
+// (copy paste del paper) The number of states is momentous, too many states could be more precisely for self-learning, but it needs more exploration, which will affect the convergence of GA, while too few states could lead poor results. According to the fitness of GA for solving FJSP and the value of S*, the state set is divided into 20 states for S = [s(1), s(2), … , s(19), s(20)] (Shahrabi et al., 2017), where the interval value of S* is set as 0.05, e.g., when S*∈[0, 0.05), s = s(1); S*∈[0.05, 0.10], s = s(2) and so on.
+
+Eq (6): 
+f_* = ( ( SUM(i=1 ... N) [((f((x_i)_t)))] ) ) / ( ( SUM(i=1 ... N) [((f((x_i)_1)))] ) ) 
+
+
+Eq (7):
+d_* = ( SUM(i=1 ... N) [ | f((x_i)_t) - (( ( SUM(i=1 ... N) [((f((x_i)_t)))] ) )/( N )) | ] ) / ( SUM(j=1 ... N) [ | f((x_j)_1) - (( ( SUM(j=1 ... N) [((f((x_j)_1)))] ) )/( N )) | ] )
+
+
+Eq (8):
+m_* = (max f((x_i)_t))/(max f((x_i)_1))
+
+
+Eq (9):
+S_* = w_1 * f_* + w_2 * d_* + w_3 * m_*
+
+
+
+
+
