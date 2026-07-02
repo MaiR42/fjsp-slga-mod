@@ -76,4 +76,51 @@ S_* = w_1 * f_* + w_2 * d_* + w_3 * m_*
 
 
 
+// Action Set (A)  //4.4
 
+
+For each generation, the agent will adopt different action to get appropriate Pc and Pm,
+10 actions are included in the action set (Shahrabi et al., 2017).
+As for Pc, whose range of commonly used values is from 0.4 to 0.9,
+and the interval value between each action is 0.05, e.g.,
+when the action is set to a1, Pc ∈ [0.4, 0.45) and a random value within this range will be selected;
+when the action is set to a2, Pc ∈ [0.45, 0. 5).
+The same method is suited for Pm, whose range of values is from 0.01 to 0.21,
+and the interval value is 0.02, e.g., when the action is set to a1,
+Pm ∈ [0.01, 0.03) and a random value within this range will be chosen
+
+// Conversion Condition
+
+// Nti represents the number of current iterations. Nts represents the total number of states.
+// Nta represents the total number of actions.
+
+Eq (5): 
+RL = { [Sarsa, N_ti < ((N_ts * N_ta)/2)], [Q-learning, N_ti >= ((N_ts * N_ta)/2)]}
+
+// After initial stage, Q-learning algorithm replaces SARSA algorithm to combine with GA and the Q value is updated by Eq. (4). The execution steps of the Learning Module are illustrated as follows (Shahrabi et al., 2017, Hsieh and Su, 2015), and the schematic is shown in Fig. 4.
+// (el paso a paso en paper igualmente)
+
+Step1: Initialize Q value table for each state-action pair.
+Step2: Obtain the current state st, s ← st.
+Step3: Select action a from action set in state s using the strategy derived from SARSA or Q-learning according to Eq. (5).
+Step4: Execute action a.
+Step5: Obtain the reinforcement reward r, and get the new state st+1.
+Step6: Terminate the process if the terminal state of GA is reached, otherwise, go to Step7.
+Step7: Update the Q value according to Eq. (3) or Eq. (4).
+Step8: Update the state: s ← st+1.
+Step9: Determine whether the conversion condition is met. If so, transform SARSA to Q-learning and go to step2. If not, go directly to step2.
+
+// Ver valor de e greedy, alpha y gamma
+
+// e-greedy
+// siendo "e" el epsilon de e-greedy
+
+pi(s_t, a_t) = {[arg max_a Q(s_t, a), si e>=r_0-1], [a(Randomly), si e<r_o-1]}
+
+learning rate α = 0.75, discount rate γ = 0.2, initial reward r = 1, and greedy rate ɛ=0.85.
+
+// Ver inicializacion de la Q-table
+
+
+
+// Criterio de parada del GA (Max_t)
