@@ -1,8 +1,8 @@
 #include <stdlib.h>
 #include <assert.h>
-#include "config.h"
+#include "rl.h"
 
-// ============== Action set (4.4) ============== 
+// ============================ Action set (4.4) ============================ 
 
 /* 
 Rango: [px_min, px_max)
@@ -139,7 +139,7 @@ int compute_state(const double *fit_t, const double *fit_1, int N)
 }
 
 
-// ============== Q TABLE ==============
+// ============================ Q TABLE ============================
 double Q[N_STATES][N_ACTIONS];
 
 void qtable_init(void)
@@ -186,5 +186,61 @@ void qtable_update_qlearning(int s_t, int a_t, double r, int s_t1)
 
     Q[s_t][a_t] = (1.0 - ALPHA) * q_sa + ALPHA * (r + GAMMA * q_max);
 }
+
+
+// ============================ Reward ============================
+
+/* Eq (10): mejora del mejor individuo respecto a la generacion anterior */
+double compute_reward_rc(const double *fit_t, const double *fit_t_prev, int N)
+{
+    double max_t    = max_array(fit_t, N);
+    double max_prev = max_array(fit_t_prev, N);
+    if (max_prev == 0.0) return 0.0;
+
+    return (max_t - max_prev) / max_prev;
+}
+
+/* Eq (11): mejora de la suma total de fitness respecto a la generacion anterior */
+double compute_reward_rm(const double *fit_t, const double *fit_t_prev, int N)
+{
+    double sum_t    = sum_array(fit_t, N);
+    double sum_prev = sum_array(fit_t_prev, N);
+    if (sum_prev == 0.0) return 0.0;
+
+    return (sum_t - sum_prev) / sum_prev;
+}
+
+// ============================ e-greedy ============================
+
+//  Conversion condition
+RLMode rl_get_mode(int n_ti)
+{
+    double threshold = (N_STATES * N_ACTIONS) / 2.0; /* = 100 con 20x10 */
+
+    if (n_ti < threshold)
+        return RL_MODE_SARSA;
+    else
+        return RL_MODE_QLEARNING;
+}
+
+int policy_random_action(void)
+{
+    return rand() % N_ACTIONS;
+}
+
+int policy_epsilon_greedy_select(int state)
+{
+    double r = rl_uniform01(); // r_0-1 // Reward entre 0 y 1
+
+    if (EPSILON >= r)
+        return qtable_argmax_action(state);
+    else
+        return policy_random_action();
+}
+
+
+
+
+
 
 // The game

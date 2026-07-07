@@ -52,7 +52,7 @@ int discretize_state(double S_star);
 /* Calcula f*, d*, m*, S* y devuelve directamente el estado discretizado */
 int compute_state(const double *fit_t, const double *fit_1, int N);
 
-// Q Table
+// ============== Q Table ==============
 
 extern double Q[N_STATES][N_ACTIONS];
 
@@ -62,9 +62,22 @@ double qtable_max_value(int s);
 void qtable_update_sarsa(int s_t, int a_t, double r, int s_t1, int a_t1);
 void qtable_update_qlearning(int s_t, int a_t, double r, int s_t1);
 
+// ============== Reward ==============
+// Eq (10)
+double compute_reward_rc(const double *fit_t, const double *fit_t_prev, int N);
+// Eq (11)
+double compute_reward_rm(const double *fit_t, const double *fit_t_prev, int N);
 
+// ============== e-greedy ==============
+// Eq (5)
+typedef enum {
+    RL_MODE_SARSA,
+    RL_MODE_QLEARNING
+} RLMode;
 
-
+RLMode rl_get_mode(int n_ti);
+int policy_random_action(void);
+int policy_epsilon_greedy_select(int state);
 
 
 
