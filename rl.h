@@ -80,7 +80,43 @@ int policy_random_action(void);
 int policy_epsilon_greedy_select(int state);
 
 
+// ============== Orquestador ==============
+/*
+ * Modo de calculo del reward. TODO: falta confirmar en el paper cual
+ * corresponde a que fase (SARSA/Q-learning). Configurable mientras tanto.
+ */
+typedef enum {
+    REWARD_USE_RC,           /* usa solo Eq (10) */
+    REWARD_USE_RM,            /* usa solo Eq (11) */
+    REWARD_USE_RC_PLUS_RM     /* suma ambas (heuristica propia, no confirmada) */
+} RewardMode;
 
+
+/* Estado interno del modulo RL, se mantiene entre generaciones */
+typedef struct {
+    int n_ti;             /* generaciones transcurridas */
+    int s_t;                /* estado actual */
+    int a_t;                 /* accion actual */
+    double *fit_gen1;       /* fitness de la generacion 1 (referencia fija, Eq 6-9) */
+    double *fit_prev;       /* fitness de la generacion anterior (Eq 10-11) */
+    int pop_size;             /* N: tamano de poblacion */
+    RewardMode reward_mode;
+} RLState;
+
+/*
+ * Inicializa el modulo (llamar UNA sola vez, al arrancar).
+ * fit_initial: fitness de la poblacion en la generacion 1 (se copia internamente).
+ */
+void rl_init(RLState *rl, const double *fit_initial, int pop_size, RewardMode mode);
+
+/*
+ * Ejecuta un paso (llamar UNA vez por generacion, con el fitness recien calculado).
+ * Devuelve por puntero el Pc y Pm a usar en la PROXIMA generacion.
+ */
+void rl_step(RLState *rl, const double *fit_current, double *pc, double *pm);
+
+/* Libera la memoria interna (fit_gen1, fit_prev) */
+void rl_free(RLState *rl);
 
 
 

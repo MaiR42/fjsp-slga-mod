@@ -33,7 +33,6 @@ double rl_uniform01(void)
     return (double)rand() / ((double)RAND_MAX + 1.0);
 }
 
-// No entendi cmo fukin funciona
 void action_get_params(int action_idx, double *pc, double *pm)
 {
     assert(action_idx >= 0 && action_idx < N_ACTIONS);
@@ -238,9 +237,84 @@ int policy_epsilon_greedy_select(int state)
         return policy_random_action();
 }
 
+// ============================ Orquestador (Main) ============================
+
+void rl_init(RLState *rl, const double *fit_initial, int pop_size, RewardMode mode)
+{
+    rl->pop_size = pop_size;
+    rl->n_ti = 0;
+    rl->reward_mode = mode;
+
+    rl->fit_gen1 = (double *)malloc(sizeof(double) * pop_size);
+    rl->fit_prev = (double *)malloc(sizeof(double) * pop_size);
+    memcpy(rl->fit_gen1, fit_initial, sizeof(double) * pop_size);
+    memcpy(rl->fit_prev, fit_initial, sizeof(double) * pop_size);
+
+    qtable_init();
+
+    /* "Choose a random action a_t, set a <- a_t" */
+    rl->a_t = policy_random_action();
+
+    /* "Calculate the State s_t of GA, set s <- s_t"
+     * En t=0, fit_current == fit_gen1, por lo que f*=d*=m*=1.0 -> S*=1.0 */
+    rl->s_t = compute_state(fit_initial, rl->fit_gen1, pop_size);
+}
 
 
+/* Auxiliar privada: calcula el reward segun el modo configurado */
+static double compute_reward(RLState *rl, const double *fit_current)
+{
+    double rc, rm;
+    switch (rl->reward_mode) {
+        case REWARD_USE_RC:
+            return compute_reward_rc(fit_current, rl->fit_prev, rl->pop_size);
+        case REWARD_USE_RM:
+            return compute_reward_rm(fit_current, rl->fit_prev, rl->pop_size);
+        case REWARD_USE_RC_PLUS_RM:
+        default:
+            rc = compute_reward_rc(fit_current, rl->fit_prev, rl->pop_size);
+            rm = compute_reward_rm(fit_current, rl->fit_prev, rl->pop_size);
+            return rc + rm;
+    }
+}
 
 
+void rl_step(RLState *rl, const double *fit_current, double *pc, double *pm)
+{
+    /* 1. Reward r_t+1 (Eq 10 / 11) */
+    double r = compute_reward(rl, fit_current);
+
+    /* 2. Nuevo estado s_t+1 (Eq 6-9) */
+    int s_next = compute_state(fit_current, rl->fit_gen1, rl->pop_size);
+
+    /* 3. Conversion condition (Eq 5) decide SARSA vs Q-learning */
+    RLMode mode = rl_get_mode(rl->n_ti);
+    int a_next;
+
+    if (mode == RL_MODE_SARSA) {
+        a_next = policy_epsilon_greedy_select(s_next);
+        qtable_update_sarsa(rl->s_t, rl->a_t, r, s_next, a_next);
+    } else {
+        qtable_update_qlearning(rl->s_t, rl->a_t, r, s_next);
+        a_next = policy_epsilon_greedy_select(s_next);
+    }
+
+    /* 4. Ejecutar accion a_t+1 y obtener nuevos Pc, Pm */
+    action_get_params(a_next, pc, pm);
+
+    /* 5. Avanzar estado interno para la proxima llamada */
+    rl->s_t = s_next;
+    rl->a_t = a_next;
+    rl->n_ti += 1;
+    memcpy(rl->fit_prev, fit_current, sizeof(double) * rl->pop_size);
+}
+
+void rl_free(RLState *rl)
+{
+    free(rl->fit_gen1);
+    free(rl->fit_prev);
+    rl->fit_gen1 = NULL;
+    rl->fit_prev = NULL;
+}
 
 // The game
