@@ -98,7 +98,7 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
     RLState rl;
     rl_init(&rl, pop.fitness, POP_SIZE, REWARD_USE_RC);
 
-    int best_cmax_ever = decode_makespan(inst, &pop.pop[best_index(pop.fitness, POP_SIZE)]);
+    int best_cmax_ever = decode_makespan_active(inst, &pop.pop[best_index(pop.fitness, POP_SIZE)]);
     double best_fitness_history[STAGNATION_WINDOW];
     for (int i = 0; i < STAGNATION_WINDOW; i++) best_fitness_history[i] = pop.fitness[best_index(pop.fitness, POP_SIZE)];
 
@@ -206,7 +206,7 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
         pop.fitness = survivor_fit;
 
         int cur_best_idx = best_index(pop.fitness, POP_SIZE);
-        int cur_cmax = decode_makespan(inst, &pop.pop[cur_best_idx]);
+        int cur_cmax = decode_makespan_active(inst, &pop.pop[cur_best_idx]);
         if (cur_cmax < best_cmax_ever) best_cmax_ever = cur_cmax;
 
         /* --- Modificacion 2: reintroduccion si hay estancamiento --- */
