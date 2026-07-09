@@ -12,9 +12,7 @@ int tournament_select(const double *fitness, int pop_size)
  * job pertenece al conjunto "kept" (J1 si keep_is_j1, J2 si no), y llena
  * las posiciones restantes con los jobs del conjunto complementario, en
  * el orden en que aparecen en fill_parent. */
-static void pox_build_child(const int *in_j1, int num_jobs, int keep_is_j1,
-                             const Chromosome *keep_parent, const Chromosome *fill_parent,
-                             Chromosome *child)
+static void pox_build_child(const int *in_j1, int num_jobs, int keep_is_j1, const Chromosome *keep_parent, const Chromosome *fill_parent, Chromosome *child)
 {
     (void)num_jobs;
     int len = keep_parent->length;
@@ -78,11 +76,67 @@ void crossover(const FJSPInstance *inst, const Chromosome *p1, const Chromosome 
     repair_chromosome(inst, c2);
 }
 
+/*
+ * Mutacion MS segun Lei (2012), CONFIRMADO por texto (citado tambien en
+ * el paper principal para "swap mutation"): intercambia las maquinas
+ * asignadas entre dos operaciones i y k, pero SOLO si el intercambio es
+ * valido en ambos sentidos (la maquina de i sirve para la operacion de k,
+ * y la maquina de k sirve para la operacion de i). Garantiza validez por
+ * construccion, sin necesitar reparacion posterior para este paso.
+ * Requiere que la operacion tenga mas de una maquina posible (|O_ij|>1).
+ */
+static int try_ms_swap_at(const FJSPInstance *inst, Chromosome *c, int i)
+{
+    int job_i = c->os[i];
+    int op_idx_i = fjsp_get_op_index(c->os, i);
+    Operation *op_i = &inst->jobs[job_i].operations[op_idx_i];
+
+    if (op_i->num_options <= 1) return 0; /* no mutable: una sola opcion de maquina */
+
+    int m_ij = c->ms[i];
+    int *theta = (int *)malloc(sizeof(int) * c->length);
+    int theta_size = 0;
+
+    for (int k = 0; k < c->length; k++) {
+        if (k == i) continue;
+        int job_k = c->os[k];
+        int op_idx_k = fjsp_get_op_index(c->os, k);
+        Operation *op_k = &inst->jobs[job_k].operations[op_idx_k];
+
+        int m_ij_valid_for_k = 0;
+        for (int a = 0; a < op_k->num_options; a++)
+            if (op_k->options[a].machine == m_ij) { m_ij_valid_for_k = 1; break; }
+        if (!m_ij_valid_for_k) continue;
+
+        int m_gh = c->ms[k];
+        int m_gh_valid_for_i = 0;
+        for (int a = 0; a < op_i->num_options; a++)
+            if (op_i->options[a].machine == m_gh) { m_gh_valid_for_i = 1; break; }
+        if (!m_gh_valid_for_i) continue;
+
+        theta[theta_size++] = k;
+    }
+
+    int did_swap = 0;
+    if (theta_size > 0) {
+        int choice = theta[rand() % theta_size];
+        int tmp = c->ms[i];
+        c->ms[i] = c->ms[choice];
+        c->ms[choice] = tmp;
+        did_swap = 1;
+    }
+    free(theta);
+    return did_swap;
+}
+
 void mutate(const FJSPInstance *inst, Chromosome *c, double pm)
 {
     int len = c->length;
 
-    /* Mutacion OS: swap mutation, gen a gen con probabilidad pm */
+    /* Mutacion OS: swap mutation, gen a gen con probabilidad pm.
+     * (Puede desalinear MS/OS en las posiciones intercambiadas -> se
+     * repara antes de aplicar la mutacion de MS, para que el swap de
+     * Lei (2012) de abajo parta de un cromosoma valido.) */
     for (int i = 0; i < len; i++) {
         double r = (double)rand() / ((double)RAND_MAX + 1.0);
         if (r < pm) {
@@ -92,22 +146,15 @@ void mutate(const FJSPInstance *inst, Chromosome *c, double pm)
             c->os[j] = tmp;
         }
     }
+    repair_chromosome(inst, c);
 
-    /* Mutacion MS: reasignacion a maquina valida aleatoria, gen a gen con probabilidad pm */
+    /* Mutacion MS: swap mutation de Lei (2012), gen a gen con probabilidad pm */
     for (int i = 0; i < len; i++) {
         double r = (double)rand() / ((double)RAND_MAX + 1.0);
         if (r < pm) {
-            int job = c->os[i];
-            int op_idx = fjsp_get_op_index(c->os, i);
-            Operation *op = &inst->jobs[job].operations[op_idx];
-            int choice = rand() % op->num_options;
-            c->ms[i] = op->options[choice].machine;
+            try_ms_swap_at(inst, c, i);
         }
     }
-
-    /* La mutacion de OS (swap) tambien puede invalidar el alineamiento
-     * MS/OS en las posiciones intercambiadas (mismo motivo que en crossover). */
-    repair_chromosome(inst, c);
 }
 
 void repair_chromosome(const FJSPInstance *inst, Chromosome *c)

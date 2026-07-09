@@ -83,7 +83,6 @@ static int worst_index_excluding(const double *fitness, int n, const int *exclud
  * Ejecuta SLGA sobre una instancia. use_modification activa las dos
  * mejoras propuestas por el usuario. Devuelve el mejor Cmax encontrado.
  */
-
 static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed, int verbose)
 {
     srand(seed);
@@ -149,26 +148,57 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
             }
         }
 
-        /* Elitismo: si el mejor individuo anterior es mejor que todo lo nuevo, lo conservamos */
-        int old_best = best_index(pop.fitness, POP_SIZE);
-        double new_fitness[POP_SIZE];
-        for (int i = 0; i < POP_SIZE; i++) new_fitness[i] = chromosome_fitness(inst, &new_pop[i]);
-        int new_best = best_index(new_fitness, POP_SIZE);
-        if (pop.fitness[old_best] > new_fitness[new_best]) {
-            chromosome_free(&new_pop[new_best]);
-            chromosome_init(&new_pop[new_best], pop.pop[old_best].length);
-            memcpy(new_pop[new_best].os, pop.pop[old_best].os, sizeof(int) * new_pop[new_best].length);
-            memcpy(new_pop[new_best].ms, pop.pop[old_best].ms, sizeof(int) * new_pop[new_best].length);
-            new_fitness[new_best] = pop.fitness[old_best];
+        /* Seleccion: "elite retention strategy" (Sec 3.1.4):
+         * se combina la poblacion anterior completa + toda la 
+         * descendencia nueva, y se conservan
+         * los N individuos con mayor fitness del conjunto combinado
+         * (se descartan los peores,). */
+        int combined_size = POP_SIZE * 2;
+        Chromosome *combined_pop = (Chromosome *)malloc(sizeof(Chromosome) * combined_size);
+        double *combined_fit = (double *)malloc(sizeof(double) * combined_size);
+
+        for (int i = 0; i < POP_SIZE; i++) {
+            combined_pop[i] = pop.pop[i];
+            combined_fit[i] = pop.fitness[i];
+        }
+        for (int i = 0; i < POP_SIZE; i++) {
+            combined_pop[POP_SIZE + i] = new_pop[i];
+            combined_fit[POP_SIZE + i] = chromosome_fitness(inst, &new_pop[i]);
+        }
+        free(new_pop); /* los Chromosome individuales ya se copiaron a combined_pop, no liberar sus arrays */
+
+        /* Seleccion de los mejores POP_SIZE (O(n^2), suficiente para pop_size chico) */
+        int *selected = (int *)malloc(sizeof(int) * POP_SIZE);
+        int *taken = (int *)calloc(combined_size, sizeof(int));
+        for (int s = 0; s < POP_SIZE; s++) {
+            int best = -1;
+            for (int i = 0; i < combined_size; i++) {
+                if (taken[i]) continue;
+                if (best == -1 || combined_fit[i] > combined_fit[best]) best = i;
+            }
+            selected[s] = best;
+            taken[best] = 1;
         }
 
-        /* reemplazar poblacion vieja */
-        for (int i = 0; i < POP_SIZE; i++) chromosome_free(&pop.pop[i]);
+        Chromosome *survivors = (Chromosome *)malloc(sizeof(Chromosome) * POP_SIZE);
+        double *survivor_fit = (double *)malloc(sizeof(double) * POP_SIZE);
+        for (int s = 0; s < POP_SIZE; s++) {
+            survivors[s] = combined_pop[selected[s]];
+            survivor_fit[s] = combined_fit[selected[s]];
+        }
+        /* liberar los que NO sobrevivieron */
+        for (int i = 0; i < combined_size; i++) {
+            if (!taken[i]) chromosome_free(&combined_pop[i]);
+        }
+        free(combined_pop);
+        free(combined_fit);
+        free(selected);
+        free(taken);
+
         free(pop.pop);
         free(pop.fitness);
-        pop.pop = new_pop;
-        pop.fitness = (double *)malloc(sizeof(double) * POP_SIZE);
-        memcpy(pop.fitness, new_fitness, sizeof(double) * POP_SIZE);
+        pop.pop = survivors;
+        pop.fitness = survivor_fit;
 
         int cur_best_idx = best_index(pop.fitness, POP_SIZE);
         int cur_cmax = decode_makespan(inst, &pop.pop[cur_best_idx]);
@@ -203,7 +233,7 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
     rl_free(&rl);
     return best_cmax_ever;
 }
-
+//
 static void run_benchmark(const char *filepath, const char *label)
 {
     FJSPInstance inst;

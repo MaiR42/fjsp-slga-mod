@@ -189,7 +189,7 @@ void qtable_update_qlearning(int s_t, int a_t, double r, int s_t1)
 
 // ============================ Reward ============================
 
-/* Eq (10): mejora del mejor individuo respecto a la generacion anterior */
+// Eq (10)
 double compute_reward_rc(const double *fit_t, const double *fit_t_prev, int N)
 {
     double max_t    = max_array(fit_t, N);
@@ -199,7 +199,7 @@ double compute_reward_rc(const double *fit_t, const double *fit_t_prev, int N)
     return (max_t - max_prev) / max_prev;
 }
 
-/* Eq (11): mejora de la suma total de fitness respecto a la generacion anterior */
+// Eq (11)
 double compute_reward_rm(const double *fit_t, const double *fit_t_prev, int N)
 {
     double sum_t    = sum_array(fit_t, N);
@@ -278,7 +278,7 @@ static double compute_reward(RLState *rl, const double *fit_current)
     }
 }
 
-
+// Mayor loop body of SLGA (Fig. 5)
 void rl_step(RLState *rl, const double *fit_current, double *pc, double *pm)
 {
     /* 1. Reward r_t+1 (Eq 10 / 11) */
@@ -287,7 +287,7 @@ void rl_step(RLState *rl, const double *fit_current, double *pc, double *pm)
     /* 2. Nuevo estado s_t+1 (Eq 6-9) */
     int s_next = compute_state(fit_current, rl->fit_gen1, rl->pop_size);
 
-    /* 3. Conversion condition (Eq 5) decide SARSA vs Q-learning */
+    /* 3. Conversion condition (Eq 5) decide entre SARSA vs Q-learning */
     RLMode mode = rl_get_mode(rl->n_ti);
     int a_next;
 

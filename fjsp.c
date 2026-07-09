@@ -232,6 +232,6 @@ int decode_makespan(const FJSPInstance *inst, const Chromosome *c)
 double chromosome_fitness(const FJSPInstance *inst, const Chromosome *c)
 {
     int cmax = decode_makespan(inst, c);
-    if (cmax <= 0) return 0.0; // En caso de ser cero o negativo
+    if (cmax <= 0) return 0.0; // En caso de
     return 1.0 / (double)cmax;
 }

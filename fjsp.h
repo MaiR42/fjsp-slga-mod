@@ -37,19 +37,11 @@ typedef struct {
     Job *jobs;                 /* array de tamano num_jobs */
 } FJSPInstance;
 
-/*
- * Carga una instancia desde un archivo .txt en el formato descrito arriba.
- * Devuelve 0 si tuvo exito, -1 si hubo error (archivo no encontrado, etc).
- * Si tiene exito, el llamador es responsable de invocar fjsp_free() despues.
- */
 int fjsp_load_from_file(const char *path, FJSPInstance *inst);
 
-/* Libera toda la memoria anidada (options de cada operation, operations de
- * cada job, y el array de jobs). */
 void fjsp_free(FJSPInstance *inst);
 
-/* Imprime la instancia completa en un formato legible, para debug. */
-void fjsp_print(const FJSPInstance *inst);
+void fjsp_print(const FJSPInstance *inst); // DEGUB
 
 // ============================ Cromosoma (encoding OS + MS, Sec 3.1.1) ============================ 
 
@@ -97,11 +89,10 @@ void chromosome_free(Chromosome *c);
  */
 void chromosome_random(const FJSPInstance *inst, Chromosome *c);
 
-/* Imprime el cromosoma (os y ms lado a lado), para debug */
-void chromosome_print(const Chromosome *c);
+void chromosome_print(const Chromosome *c); // DEGUB
 
 int decode_makespan(const FJSPInstance *inst, const Chromosome *c);
- 
+
 /* fitness = 1 / Cmax */
 double chromosome_fitness(const FJSPInstance *inst, const Chromosome *c);
 
