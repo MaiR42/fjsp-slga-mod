@@ -29,7 +29,7 @@
  */
 
 #define POP_SIZE 100
-#define MAX_GENERATIONS 2000
+#define MAX_GENERATIONS 1500
 
 // Parametros para la modificacion
 #define STAGNATION_WINDOW 30        /* K generaciones para juzgar estancamiento */
@@ -423,6 +423,7 @@ int main(int argc, char **argv)
     tiempo_empleado = ((double)(fin - inicio)) / CLOCKS_PER_SEC;
 
     printf("El programa tardó: %f segundos en ejecutarse.\n", tiempo_empleado);
-
+    printf("Maxima cantidad de generaciones: %d \n", MAX_GENERATIONS);
+    printf("Tamaño de poblacion inicial: %d \n",POP_SIZE);
     return 0;
 }
