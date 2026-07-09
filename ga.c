@@ -1,5 +1,8 @@
 #include <stdlib.h>
 #include "ga.h"
+// instrumentacion de repair_chromosome  
+static long g_repair_total_checked = 0;
+static long g_repair_total_repaired = 0;
 
 int tournament_select(const double *fitness, int pop_size)
 {
@@ -8,10 +11,10 @@ int tournament_select(const double *fitness, int pop_size)
     return (fitness[a] >= fitness[b]) ? a : b;
 }
 
-/* Auxiliar POX: arma un hijo copiando de keep_parent las posiciones cuyo
- * job pertenece al conjunto "kept" (J1 si keep_is_j1, J2 si no), y llena
- * las posiciones restantes con los jobs del conjunto complementario, en
- * el orden en que aparecen en fill_parent. */
+/* Auxiliar POX (VERSION MEJORADA): arma un hijo copiando de keep_parent
+ * las posiciones cuyo job pertenece al conjunto "kept", y llena las
+ * posiciones restantes con los jobs del conjunto complementario, en el
+ * orden en que aparecen en fill_parent. */
 static void pox_build_child(const int *in_j1, int num_jobs, int keep_is_j1, const Chromosome *keep_parent, const Chromosome *fill_parent, Chromosome *child)
 {
     (void)num_jobs;
@@ -21,7 +24,12 @@ static void pox_build_child(const int *in_j1, int num_jobs, int keep_is_j1, cons
         int job = keep_parent->os[i];
         int job_in_j1 = in_j1[job];
         int keep = keep_is_j1 ? job_in_j1 : !job_in_j1;
-        child->os[i] = keep ? job : -1; /* -1 = vacante, se llena despues */
+        if (keep) {
+            child->os[i] = job;
+            child->ms[i] = keep_parent->ms[i]; /* <-- NUEVO: MS acoplado (antes: cruce de 2 puntos aparte) */
+        } else {
+            child->os[i] = -1; /* -1 = vacante, se llena despues */
+        }
     }
 
     int idx = 0;
@@ -31,11 +39,13 @@ static void pox_build_child(const int *in_j1, int num_jobs, int keep_is_j1, cons
             int job = fill_parent->os[idx];
             int job_in_j1 = in_j1[job];
             int should_fill = keep_is_j1 ? !job_in_j1 : job_in_j1; /* complemento */
-            idx++;
             if (should_fill) {
                 child->os[i] = job;
+                child->ms[i] = fill_parent->ms[idx]; /* <-- NUEVO: MS acoplado (antes: cruce de 2 puntos aparte) */
+                idx++;
                 break;
             }
+            idx++;
         }
     }
 }
@@ -54,24 +64,8 @@ void crossover(const FJSPInstance *inst, const Chromosome *p1, const Chromosome 
     pox_build_child(in_j1, inst->num_jobs, 0, p2, p1, c2); /* c2: kept=J2 de p2, relleno=J1 de p1 */
     free(in_j1);
 
-    /* --- Cruce MS: dos puntos, por posicion --- */
-    int cut1 = rand() % len;
-    int cut2 = rand() % len;
-    if (cut1 > cut2) { int t = cut1; cut1 = cut2; cut2 = t; }
-
-    for (int i = 0; i < len; i++) {
-        if (i >= cut1 && i <= cut2) {
-            c1->ms[i] = p2->ms[i];
-            c2->ms[i] = p1->ms[i];
-        } else {
-            c1->ms[i] = p1->ms[i];
-            c2->ms[i] = p2->ms[i];
-        }
-    }
-
-    /* El cruce de OS (POX) reordena las operaciones -> el MS heredado por
-     * posicion puede quedar invalido para la operacion que cayo en esa
-     * posicion. Se corrige a continuacion (ver nota en ga.h). */
+    /* repair_chromosome ahora es solo una red de seguridad: con MS acoplado
+     * al POX, cada gen heredado ya es valido por construccion*/
     repair_chromosome(inst, c1);
     repair_chromosome(inst, c2);
 }
@@ -168,9 +162,38 @@ void repair_chromosome(const FJSPInstance *inst, Chromosome *c)
         for (int k = 0; k < op->num_options; k++) {
             if (op->options[k].machine == c->ms[i]) { valid = 1; break; }
         }
+        g_repair_total_checked++;
         if (!valid) {
+            g_repair_total_repaired++;
             int choice = rand() % op->num_options;
             c->ms[i] = op->options[choice].machine;
         }
+    }
+}
+
+/* getters/reset de la instrumentacion de arriba */
+long repair_get_total_genes_checked(void) { return g_repair_total_checked; }
+long repair_get_total_genes_repaired(void) { return g_repair_total_repaired; }
+void repair_reset_counters(void) { g_repair_total_checked = 0; g_repair_total_repaired = 0; }
+
+// Experimental DEBUG
+void mutate_once_per_chromosome(const FJSPInstance *inst, Chromosome *c, double pm)
+{
+    int len = c->length;
+    double r = (double)rand() / ((double)RAND_MAX + 1.0);
+    if (r >= pm) return; /* no muta este cromosoma */
+
+    /* Un swap en OS */
+    int i = rand() % len;
+    int j = rand() % len;
+    int tmp = c->os[i];
+    c->os[i] = c->os[j];
+    c->os[j] = tmp;
+    repair_chromosome(inst, c); /* el swap de OS puede desalinear MS */
+
+    /* Un intento de swap Lei-MS (hasta 5 intentos en posiciones distintas) */
+    for (int attempt = 0; attempt < 5; attempt++) {
+        int pos = rand() % len;
+        if (try_ms_swap_at(inst, c, pos)) break;
     }
 }

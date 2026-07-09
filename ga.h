@@ -36,4 +36,16 @@ void mutate(const FJSPInstance *inst, Chromosome *c, double pm);
 /* Corrige genes de MS invalidos (ver nota de arriba). Se llama despues de crossover/mutate. */
 void repair_chromosome(const FJSPInstance *inst, Chromosome *c);
 
+long repair_get_total_genes_checked(void);
+long repair_get_total_genes_repaired(void);
+void repair_reset_counters(void);
+ 
+/*
+ * Mutacion ALTERNATIVA: Pm se evalua UNA sola vez por cromosoma (no por
+ * gen). Si ocurre, hace UN swap en OS y UN intento de swap Lei-MS.
+ * Para comparar contra mutate() (Pm por gen)
+ */
+// Experimental
+void mutate_once_per_chromosome(const FJSPInstance *inst, Chromosome *c, double pm);
+
 #endif /* GA_H */
