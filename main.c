@@ -28,7 +28,7 @@
  * valido con casos a mano paso a paso).
  */
 
-#define POP_SIZE 100
+#define POP_SIZE 50
 #define MAX_GENERATIONS 1500
 
 // Parametros para la modificacion
@@ -37,6 +37,7 @@
 #define REINTRO_FRACTION 0.10       /* fraccion de la poblacion a reintroducir si hay estancamiento */
 #define ADAPTIVE_MUT_MAX_MULT 1.5   /* multiplicador maximo de Pm cuando diversidad es baja */
 
+#define DIVERSITY_RESERVE_FRACTION 0.15
 
 typedef struct {
     FJSPInstance *inst;
@@ -96,7 +97,7 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
     population_init(&pop, inst, POP_SIZE);
 
     RLState rl;
-    rl_init(&rl, pop.fitness, POP_SIZE, REWARD_USE_RC);
+    rl_init(&rl, pop.fitness, POP_SIZE, REWARD_USE_RC_PLUS_RM);
 
     int best_cmax_ever = decode_makespan_active(inst, &pop.pop[best_index(pop.fitness, POP_SIZE)]);
     double best_fitness_history[STAGNATION_WINDOW];
@@ -173,9 +174,12 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
         free(new_pop); /* los Chromosome individuales ya se copiaron a combined_pop, no liberar sus arrays */
 
         /* Seleccion de los mejores POP_SIZE (O(n^2), suficiente para pop_size chico) */
+        // Nuevo, elitismo suavizado
+        int strict_count = (int)(POP_SIZE * (1.0 - DIVERSITY_RESERVE_FRACTION));
         int *selected = (int *)malloc(sizeof(int) * POP_SIZE);
         int *taken = (int *)calloc(combined_size, sizeof(int));
-        for (int s = 0; s < POP_SIZE; s++) {
+
+        for (int s = 0; s < strict_count; s++) {
             int best = -1;
             for (int i = 0; i < combined_size; i++) {
                 if (taken[i]) continue;
@@ -184,6 +188,16 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
             selected[s] = best;
             taken[best] = 1;
         }
+        /* Resto de las posiciones: al azar entre los NO tomados (diversidad) */
+        for (int s = strict_count; s < POP_SIZE; s++) {
+            int idx;
+            do {
+                idx = rand() % combined_size;
+            } while (taken[idx]);
+            selected[s] = idx;
+            taken[idx] = 1;
+        }
+
 
         Chromosome *survivors = (Chromosome *)malloc(sizeof(Chromosome) * POP_SIZE);
         double *survivor_fit = (double *)malloc(sizeof(double) * POP_SIZE);

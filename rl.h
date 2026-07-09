@@ -88,7 +88,7 @@ int policy_epsilon_greedy_select(int state);
 typedef enum {
     REWARD_USE_RC,           /* usa solo Eq (10) */
     REWARD_USE_RM,            /* usa solo Eq (11) */
-    REWARD_USE_RC_PLUS_RM     /* suma ambas (heuristica propia, no confirmada) */
+    REWARD_USE_RC_PLUS_RM     /* suma ambas */
 } RewardMode;
 
 
