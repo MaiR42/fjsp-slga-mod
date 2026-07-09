@@ -91,9 +91,15 @@ void chromosome_random(const FJSPInstance *inst, Chromosome *c);
 
 void chromosome_print(const Chromosome *c); // DEGUB
 
+// Para el decoder semi-activo
 int decode_makespan(const FJSPInstance *inst, const Chromosome *c);
 
 /* fitness = 1 / Cmax */
 double chromosome_fitness(const FJSPInstance *inst, const Chromosome *c);
+
+// Para el decoder activo
+int decode_makespan_active(const FJSPInstance *inst, const Chromosome *c);
+double chromosome_fitness_active(const FJSPInstance *inst, const Chromosome *c);
+
 
 #endif /* FJSP_H */

@@ -1,7 +1,11 @@
+#define _POSIX_C_SOURCE 200809L
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <dirent.h>
+#include <sys/stat.h>
 #include "fjsp.h"
 #include "ga.h"
 #include "rl.h"
@@ -24,14 +28,15 @@
  * valido con casos a mano paso a paso).
  */
 
-#define POP_SIZE 30
-#define MAX_GENERATIONS 200
+#define POP_SIZE 100
+#define MAX_GENERATIONS 2000
 
-/* --- Parametros de la modificacion propuesta --- */
-#define STAGNATION_WINDOW 15        /* K generaciones para juzgar estancamiento */
-#define STAGNATION_THRESHOLD 0.001  /* mejora relativa minima para NO considerar estancado */
-#define REINTRO_FRACTION 0.20       /* fraccion de la poblacion a reintroducir si hay estancamiento */
-#define ADAPTIVE_MUT_MAX_MULT 2.0   /* multiplicador maximo de Pm cuando diversidad es baja */
+// Parametros para la modificacion
+#define STAGNATION_WINDOW 30        /* K generaciones para juzgar estancamiento */
+#define STAGNATION_THRESHOLD 0.01  /* mejora relativa minima para NO considerar estancado */
+#define REINTRO_FRACTION 0.10       /* fraccion de la poblacion a reintroducir si hay estancamiento */
+#define ADAPTIVE_MUT_MAX_MULT 1.5   /* multiplicador maximo de Pm cuando diversidad es baja */
+
 
 typedef struct {
     FJSPInstance *inst;
@@ -49,7 +54,7 @@ static void population_init(Population *p, FJSPInstance *inst, int pop_size)
 
     for (int i = 0; i < pop_size; i++) {
         chromosome_random(inst, &p->pop[i]);
-        p->fitness[i] = chromosome_fitness(inst, &p->pop[i]);
+        p->fitness[i] = chromosome_fitness_active(inst, &p->pop[i]);
     }
 }
 
@@ -148,11 +153,11 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
             }
         }
 
-        /* Seleccion: "elite retention strategy" (Sec 3.1.4):
-         * se combina la poblacion anterior completa + toda la 
-         * descendencia nueva, y se conservan
+        /* --- Seleccion/Reemplazo: "elite retention strategy" (confirmado
+         * textualmente en el paper, Sec 3.1.4): se combina la poblacion
+         * anterior completa + toda la descendencia nueva, y se conservan
          * los N individuos con mayor fitness del conjunto combinado
-         * (se descartan los peores,). */
+         * (se descartan los peores, sin importar si son padres o hijos). */
         int combined_size = POP_SIZE * 2;
         Chromosome *combined_pop = (Chromosome *)malloc(sizeof(Chromosome) * combined_size);
         double *combined_fit = (double *)malloc(sizeof(double) * combined_size);
@@ -163,7 +168,7 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
         }
         for (int i = 0; i < POP_SIZE; i++) {
             combined_pop[POP_SIZE + i] = new_pop[i];
-            combined_fit[POP_SIZE + i] = chromosome_fitness(inst, &new_pop[i]);
+            combined_fit[POP_SIZE + i] = chromosome_fitness_active(inst, &new_pop[i]);
         }
         free(new_pop); /* los Chromosome individuales ya se copiaron a combined_pop, no liberar sus arrays */
 
@@ -218,7 +223,7 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
                     if (worst == -1) break;
                     chromosome_free(&pop.pop[worst]);
                     chromosome_random(inst, &pop.pop[worst]);
-                    pop.fitness[worst] = chromosome_fitness(inst, &pop.pop[worst]);
+                    pop.fitness[worst] = chromosome_fitness_active(inst, &pop.pop[worst]);
                 }
             }
             best_fitness_history[hist_idx] = pop.fitness[cur_best_idx];
@@ -233,7 +238,7 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
     rl_free(&rl);
     return best_cmax_ever;
 }
-//
+
 static void run_benchmark(const char *filepath, const char *label)
 {
     FJSPInstance inst;
@@ -273,16 +278,151 @@ static void run_benchmark(const char *filepath, const char *label)
     fjsp_free(&inst);
 }
 
+// =========== Para buscar en path "instances/.../"===========
+
+static int has_txt_extension(const char *name)
+{
+    size_t len = strlen(name);
+    return len > 4 && strcmp(name + len - 4, ".txt") == 0;
+}
+
+static int compare_strings(const void *a, const void *b)
+{
+    return strcmp(*(const char **)a, *(const char **)b);
+}
+
+
+static const char *DEFAULT_INSTANCE_DIRS[] = {
+    "instances/brandimarte",
+    "instances/kacem",
+};
+#define NUM_DEFAULT_DIRS (int)(sizeof(DEFAULT_INSTANCE_DIRS) / sizeof(DEFAULT_INSTANCE_DIRS[0]))
+
+/*
+ * Intenta resolver `arg` a una ruta real de archivo, probando varias
+ * combinaciones. Devuelve 1 y escribe en `out` si encontro algo, 0 si no.
+ * Orden de intentos para arg="mk01":
+ *   1. "mk01"                                (tal cual, por si ya es una ruta valida)
+ *   2. "mk01.txt"                             (agregando extension)
+ *   3. "instances/brandimarte/mk01"           (carpeta por defecto, tal cual)
+ *   4. "instances/brandimarte/mk01.txt"       (carpeta por defecto + extension)
+ *   5. lo mismo para "instances/kacem/..."
+ */
+static int resolve_instance_path(const char *arg, char *out, size_t out_size)
+{
+    struct stat st;
+    size_t arg_len = strlen(arg);
+    int already_has_txt = (arg_len > 4 && strcmp(arg + arg_len - 4, ".txt") == 0);
+
+    /* 1. tal cual */
+    if (stat(arg, &st) == 0) {
+        snprintf(out, out_size, "%s", arg);
+        return 1;
+    }
+    /* 2. agregando .txt */
+    if (!already_has_txt) {
+        snprintf(out, out_size, "%s.txt", arg);
+        if (stat(out, &st) == 0) return 1;
+    }
+    /* 3-4-5-6: carpetas por defecto, con y sin .txt */
+    for (int d = 0; d < NUM_DEFAULT_DIRS; d++) {
+        snprintf(out, out_size, "%s/%s", DEFAULT_INSTANCE_DIRS[d], arg);
+        if (stat(out, &st) == 0) return 1;
+
+        if (!already_has_txt) {
+            snprintf(out, out_size, "%s/%s.txt", DEFAULT_INSTANCE_DIRS[d], arg);
+            if (stat(out, &st) == 0) return 1;
+        }
+    }
+
+    return 0; // No encontrado
+}
+
+static void run_path(const char *path)
+{
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        printf("No se pudo acceder a '%s'\n", path);
+        return;
+    }
+
+    if (S_ISDIR(st.st_mode)) {
+        DIR *dir = opendir(path);
+        if (!dir) {
+            printf("No se pudo leer el directorio '%s'\n", path);
+            return;
+        }
+
+        /* juntar nombres de archivos .txt */
+        char **names = NULL;
+        int count = 0, capacity = 0;
+        struct dirent *entry;
+        while ((entry = readdir(dir)) != NULL) {
+            if (!has_txt_extension(entry->d_name)) continue;
+            if (count >= capacity) {
+                capacity = capacity == 0 ? 16 : capacity * 2;
+                names = (char **)realloc(names, sizeof(char *) * capacity);
+            }
+            names[count] = strdup(entry->d_name);
+            count++;
+        }
+        closedir(dir);
+
+        /* orden alfabetico para resultados reproducibles */
+        qsort(names, count, sizeof(char *), compare_strings);
+
+        for (int i = 0; i < count; i++) {
+            char fullpath[1024];
+            snprintf(fullpath, sizeof(fullpath), "%s/%s", path, names[i]);
+            run_benchmark(fullpath, names[i]);
+            free(names[i]);
+        }
+        free(names);
+    } else {
+        run_benchmark(path, path);
+    }
+}
+
 int main(int argc, char **argv)
 {
+    clock_t inicio, fin;
+    double tiempo_empleado;
+
+    inicio = clock();
+
     if (argc < 2) {
-        printf("Uso: %s <archivo1.txt> [archivo2.txt] ...\n", argv[0]);
+        printf("Uso: %s <nombre_instancia | archivo.txt | carpeta> ...\n", argv[0]);
+        printf("Ej:  %s mk01                    (busca en instances/brandimarte/mk01.txt)\n", argv[0]);
+        printf("Ej:  %s mk01 mk02 k1             (varias instancias por nombre)\n", argv[0]);
+        printf("Ej:  %s instances/brandimarte    (corre TODAS las .txt de la carpeta)\n", argv[0]);
+        printf("Ej:  %s k1.txt mk01.txt          (rutas completas, como antes)\n", argv[0]);
         return 1;
     }
 
     for (int i = 1; i < argc; i++) {
-        run_benchmark(argv[i], argv[i]);
+        struct stat st;
+        /* Si es directamente una carpeta, mantenemos el comportamiento anterior
+         * (escanear todas las .txt adentro). */
+        if (stat(argv[i], &st) == 0 && S_ISDIR(st.st_mode)) {
+            run_path(argv[i]);
+            continue;
+        }
+
+        /* Si no, intentamos resolver por nombre (con o sin extension, en las
+         * carpetas por defecto instances/brandimarte e instances/kacem). */
+        char resolved[1024];
+        if (resolve_instance_path(argv[i], resolved, sizeof(resolved))) {
+            run_benchmark(resolved, argv[i]);
+        } else {
+            printf("No se encontro la instancia '%s' (probe: tal cual, +.txt, "
+                   "instances/brandimarte/, instances/kacem/)\n", argv[i]);
+        }
     }
+
+    fin = clock();
+    tiempo_empleado = ((double)(fin - inicio)) / CLOCKS_PER_SEC;
+
+    printf("El programa tardó: %f segundos en ejecutarse.\n", tiempo_empleado);
 
     return 0;
 }

@@ -235,3 +235,95 @@ double chromosome_fitness(const FJSPInstance *inst, const Chromosome *c)
     if (cmax <= 0) return 0.0; // En caso de
     return 1.0 / (double)cmax;
 }
+
+// Nuevo
+// ============================ Decoder (Activo) + Fitness ============================
+
+typedef struct {
+    int start;
+    int end;
+} Interval;
+
+int decode_makespan_active(const FJSPInstance *inst, const Chromosome *c)
+{
+    int *job_end = (int *)calloc(inst->num_jobs, sizeof(int));
+
+    /* lista dinamica de intervalos ocupados por cada maquina, ordenada por start */
+    Interval **machine_intervals = (Interval **)calloc(inst->num_machines, sizeof(Interval *));
+    int *machine_count = (int *)calloc(inst->num_machines, sizeof(int));
+    int *machine_capacity = (int *)calloc(inst->num_machines, sizeof(int));
+
+    int makespan = 0;
+
+    for (int i = 0; i < c->length; i++) {
+        int job = c->os[i];
+        int op_idx = fjsp_get_op_index(c->os, i);
+        Operation *op = &inst->jobs[job].operations[op_idx];
+        int machine = c->ms[i];
+
+        int proc_time = -1;
+        for (int k = 0; k < op->num_options; k++) {
+            if (op->options[k].machine == machine) {
+                proc_time = op->options[k].processing_time;
+                break;
+            }
+        }
+
+        int earliest_start = job_end[job];
+        int n = machine_count[machine];
+        Interval *iv = machine_intervals[machine];
+
+        /* buscar el primer hueco donde la operacion quepa, respetando precedencia */
+        int start = -1;
+        int prev_end = 0;
+        for (int k = 0; k < n; k++) {
+            int gap_start = prev_end;
+            int gap_end = iv[k].start;
+            int candidate = earliest_start > gap_start ? earliest_start : gap_start;
+            if (candidate + proc_time <= gap_end) {
+                start = candidate;
+                break;
+            }
+            prev_end = iv[k].end;
+        }
+        if (start == -1) {
+            /* no hay hueco: va despues del ultimo intervalo (o en earliest_start si la maquina esta vacia) */
+            start = earliest_start > prev_end ? earliest_start : prev_end;
+        }
+        int end = start + proc_time;
+
+        /* insertar el nuevo intervalo manteniendo el orden por start */
+        int idx = 0;
+        while (idx < machine_count[machine] && machine_intervals[machine][idx].start < start) idx++;
+
+        if (machine_count[machine] >= machine_capacity[machine]) {
+            machine_capacity[machine] = machine_capacity[machine] == 0 ? 4 : machine_capacity[machine] * 2;
+            machine_intervals[machine] = (Interval *)realloc(machine_intervals[machine],
+                                                                sizeof(Interval) * machine_capacity[machine]);
+        }
+        for (int s = machine_count[machine]; s > idx; s--) {
+            machine_intervals[machine][s] = machine_intervals[machine][s - 1];
+        }
+        machine_intervals[machine][idx].start = start;
+        machine_intervals[machine][idx].end = end;
+        machine_count[machine]++;
+
+        job_end[job] = end;
+        if (end > makespan) makespan = end;
+    }
+
+    free(job_end);
+    for (int m = 0; m < inst->num_machines; m++) free(machine_intervals[m]);
+    free(machine_intervals);
+    free(machine_count);
+    free(machine_capacity);
+
+    return makespan;
+}
+
+double chromosome_fitness_active(const FJSPInstance *inst, const Chromosome *c)
+{
+    int cmax = decode_makespan_active(inst, c);
+    if (cmax <= 0) return 0.0;
+    return 1.0 / (double)cmax;
+}
