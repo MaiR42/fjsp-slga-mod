@@ -177,11 +177,12 @@ long repair_get_total_genes_repaired(void) { return g_repair_total_repaired; }
 void repair_reset_counters(void) { g_repair_total_checked = 0; g_repair_total_repaired = 0; }
 
 // Experimental DEBUG
+// No se especifica como se aplica la mutacion, por lo que hay 2 modulos relacionados (mutate y mutate_once_per_chromosome)
 void mutate_once_per_chromosome(const FJSPInstance *inst, Chromosome *c, double pm)
 {
     int len = c->length;
     double r = (double)rand() / ((double)RAND_MAX + 1.0);
-    if (r >= pm) return; /* no muta este cromosoma */
+    if (r >= pm) return; // Ignora el cromosoma
 
     /* Un swap en OS */
     int i = rand() % len;

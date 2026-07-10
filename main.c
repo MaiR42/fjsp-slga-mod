@@ -30,12 +30,13 @@
 
 #define POP_SIZE 50
 #define MAX_GENERATIONS 1500
+#define N_SEEDS 10
 
 // Parametros para la modificacion
-#define STAGNATION_WINDOW 30        /* K generaciones para juzgar estancamiento */
-#define STAGNATION_THRESHOLD 0.01  /* mejora relativa minima para NO considerar estancado */
-#define REINTRO_FRACTION 0.10       /* fraccion de la poblacion a reintroducir si hay estancamiento */
-#define ADAPTIVE_MUT_MAX_MULT 1.5   /* multiplicador maximo de Pm cuando diversidad es baja */
+#define STAGNATION_WINDOW 50        /* K generaciones para juzgar estancamiento */
+#define STAGNATION_THRESHOLD 0.02  /* mejora relativa minima para NO considerar estancado */
+#define REINTRO_FRACTION 0.3       /* fraccion de la poblacion a reintroducir si hay estancamiento */
+#define ADAPTIVE_MUT_MAX_MULT 1.2   /* multiplicador maximo de Pm cuando diversidad es baja */
 
 #define DIVERSITY_RESERVE_FRACTION 0.15
 
@@ -263,8 +264,8 @@ static void run_benchmark(const char *filepath, const char *label)
 
     printf("=== %s (%s) ===\n", label, filepath);
 
-    int n_seeds = 5;
-    int baseline_results[5], modified_results[5];
+    int n_seeds = N_SEEDS;
+    int baseline_results[n_seeds], modified_results[n_seeds];
 
     for (int s = 0; s < n_seeds; s++) {
         unsigned int seed = 1000 + s;
@@ -415,15 +416,10 @@ int main(int argc, char **argv)
 
     for (int i = 1; i < argc; i++) {
         struct stat st;
-        /* Si es directamente una carpeta, mantenemos el comportamiento anterior
-         * (escanear todas las .txt adentro). */
         if (stat(argv[i], &st) == 0 && S_ISDIR(st.st_mode)) {
             run_path(argv[i]);
             continue;
         }
-
-        /* Si no, intentamos resolver por nombre (con o sin extension, en las
-         * carpetas por defecto instances/brandimarte e instances/kacem). */
         char resolved[1024];
         if (resolve_instance_path(argv[i], resolved, sizeof(resolved))) {
             run_benchmark(resolved, argv[i]);

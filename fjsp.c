@@ -87,7 +87,7 @@ void fjsp_free(FJSPInstance *inst)
     inst->num_machines = 0;
 }
 
-void fjsp_print(const FJSPInstance *inst)
+void fjsp_print(const FJSPInstance *inst) // DEBUG
 {
     printf("Instancia FJSP: %d jobs, %d maquinas\n", inst->num_jobs, inst->num_machines);
     for (int j = 0; j < inst->num_jobs; j++) {
@@ -180,7 +180,7 @@ void chromosome_random(const FJSPInstance *inst, Chromosome *c)
     }
 }
 
-void chromosome_print(const Chromosome *c)
+void chromosome_print(const Chromosome *c) // DEBUG
 {
     printf("OS: ");
     for (int i = 0; i < c->length; i++) printf("%d ", c->os[i]);
