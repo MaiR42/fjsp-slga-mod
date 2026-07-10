@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "fjsp.h"
 
+// ============================ Carga de instancias ============================ 
 /* Libera solo los primeros `count` jobs de un array (usado tanto por
  * fjsp_free como para limpiar parcialmente si el parser falla a mitad). */
 static void free_jobs(Job *jobs, int count)
@@ -189,11 +190,13 @@ void chromosome_print(const Chromosome *c) // DEBUG
     printf("\n");
 }
 
+/* ====================================================================================
+ * En la documentacion original no se menciona el tipo de decoder,
+ * por lo que se definieron 2, uno de tipo activo (first fit) y otro semi-activo.
+ * Actualmente se aplica el decoder activo en main.c ya que se obtienen mejores resultados
+ * ==================================================================================== */
 
 // ============================ Decoder (semi-activo) + Fitness ============================
-
-// Decoder no indicado en el paper, por lo que se eligio uno semi-activo temporalmente
- 
 int decode_makespan(const FJSPInstance *inst, const Chromosome *c)
 {
     int *job_end     = (int *)calloc(inst->num_jobs, sizeof(int));
@@ -228,17 +231,16 @@ int decode_makespan(const FJSPInstance *inst, const Chromosome *c)
     free(machine_free);
     return makespan;
 }
- 
+
+// f = 1/Cmax 
 double chromosome_fitness(const FJSPInstance *inst, const Chromosome *c)
 {
     int cmax = decode_makespan(inst, c);
-    if (cmax <= 0) return 0.0; // En caso de
+    if (cmax <= 0) return 0.0; // Por si acaso
     return 1.0 / (double)cmax;
 }
 
-// Nuevo
 // ============================ Decoder (Activo) + Fitness ============================
-
 typedef struct {
     int start;
     int end;
@@ -321,9 +323,10 @@ int decode_makespan_active(const FJSPInstance *inst, const Chromosome *c)
     return makespan;
 }
 
+// f = 1/Cmax 
 double chromosome_fitness_active(const FJSPInstance *inst, const Chromosome *c)
 {
     int cmax = decode_makespan_active(inst, c);
-    if (cmax <= 0) return 0.0;
+    if (cmax <= 0) return 0.0; // Por si acaso
     return 1.0 / (double)cmax;
 }
