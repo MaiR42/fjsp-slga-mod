@@ -6,9 +6,17 @@ static long g_repair_total_repaired = 0;
 
 int tournament_select(const double *fitness, int pop_size)
 {
-    int a = rand() % pop_size;
-    int b = rand() % pop_size;
-    return (fitness[a] >= fitness[b]) ? a : b;
+    return tournament_select_k(fitness, pop_size, 2);
+}
+
+int tournament_select_k(const double *fitness, int pop_size, int k)
+{
+    int best = rand() % pop_size;
+    for (int i = 1; i < k; i++) {
+        int challenger = rand() % pop_size;
+        if (fitness[challenger] > fitness[best]) best = challenger;
+    }
+    return best;
 }
 
 /* Auxiliar POX (VERSION MEJORADA): arma un hijo copiando de keep_parent
@@ -70,15 +78,6 @@ void crossover(const FJSPInstance *inst, const Chromosome *p1, const Chromosome 
     repair_chromosome(inst, c2);
 }
 
-/*
- * Mutacion MS segun Lei (2012), CONFIRMADO por texto (citado tambien en
- * el paper principal para "swap mutation"): intercambia las maquinas
- * asignadas entre dos operaciones i y k, pero SOLO si el intercambio es
- * valido en ambos sentidos (la maquina de i sirve para la operacion de k,
- * y la maquina de k sirve para la operacion de i). Garantiza validez por
- * construccion, sin necesitar reparacion posterior para este paso.
- * Requiere que la operacion tenga mas de una maquina posible (|O_ij|>1).
- */
 static int try_ms_swap_at(const FJSPInstance *inst, Chromosome *c, int i)
 {
     int job_i = c->os[i];
@@ -162,7 +161,7 @@ void repair_chromosome(const FJSPInstance *inst, Chromosome *c)
         for (int k = 0; k < op->num_options; k++) {
             if (op->options[k].machine == c->ms[i]) { valid = 1; break; }
         }
-        g_repair_total_checked++;
+        g_repair_total_checked++; 
         if (!valid) {
             g_repair_total_repaired++;
             int choice = rand() % op->num_options;

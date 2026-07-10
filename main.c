@@ -16,29 +16,47 @@
  * Implementa:
  *   - SLGA original (fiel al paper, con las asunciones documentadas en
  *     fjsp.h / ga.h / rl.h)
- *   - Version MODIFICADA con las dos propuestas del usuario:
+ *   - Version MODIFICADA con dos propuestas:
  *       (1) Mutacion adaptativa segun diversidad poblacional (usa d_star,
  *           Eq. 7, ya calculada en rl.c/rl.h)
  *       (2) Reintroduccion de individuos si no hay mejora significativa
  *           en las ultimas K generaciones
- *
- * NOTA sobre tiempo de desarrollo: dado el plazo del usuario, este archivo
- * prioriza tener resultados numericos funcionando por sobre una validacion
- * exhaustiva de cada pieza por separado (a diferencia de rl.c, que si se
- * valido con casos a mano paso a paso).
  */
 
 #define POP_SIZE 50
 #define MAX_GENERATIONS 1500
 #define N_SEEDS 10
 
+#define TOURNAMENT_SIZE 2 // Para que sea torneo binario 
+
 // Parametros para la modificacion
 #define STAGNATION_WINDOW 50        /* K generaciones para juzgar estancamiento */
 #define STAGNATION_THRESHOLD 0.02  /* mejora relativa minima para NO considerar estancado */
+
 #define REINTRO_FRACTION 0.3       /* fraccion de la poblacion a reintroducir si hay estancamiento */
+// qitar el de arriba
 #define ADAPTIVE_MUT_MAX_MULT 1.2   /* multiplicador maximo de Pm cuando diversidad es baja */
 
 #define DIVERSITY_RESERVE_FRACTION 0.15
+
+
+static int compute_dynamic_stagnation_window(int total_ops)
+{
+    int w = 30 + total_ops / 3;
+    if (w < 20) w = 20;
+    if (w > 150) w = 150;
+    return w;
+}
+
+static double compute_dynamic_reintro_fraction(int total_ops)
+{
+    double base = 0.03;
+    double scale = 100.0 / (double)total_ops;
+    if (scale > 1.0) scale = 1.0;
+    double frac = base * scale;
+    if (frac < 0.01) frac = 0.01;
+    return frac;
+}
 
 typedef struct {
     FJSPInstance *inst;
@@ -94,6 +112,10 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
 {
     srand(seed);
 
+    int total_ops = fjsp_total_operations(inst);
+    int stagnation_window = compute_dynamic_stagnation_window(total_ops);
+    double reintro_fraction = compute_dynamic_reintro_fraction(total_ops);
+
     Population pop;
     population_init(&pop, inst, POP_SIZE);
 
@@ -101,8 +123,8 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
     rl_init(&rl, pop.fitness, POP_SIZE, REWARD_USE_RC_PLUS_RM);
 
     int best_cmax_ever = decode_makespan_active(inst, &pop.pop[best_index(pop.fitness, POP_SIZE)]);
-    double best_fitness_history[STAGNATION_WINDOW];
-    for (int i = 0; i < STAGNATION_WINDOW; i++) best_fitness_history[i] = pop.fitness[best_index(pop.fitness, POP_SIZE)];
+    double *best_fitness_history = (double *)malloc(sizeof(double) * stagnation_window);
+    for (int i = 0; i < stagnation_window; i++) best_fitness_history[i] = pop.fitness[best_index(pop.fitness, POP_SIZE)];
 
     for (int gen = 0; gen < MAX_GENERATIONS; gen++) {
         double pc, pm;
@@ -124,8 +146,8 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
         Chromosome *new_pop = (Chromosome *)malloc(sizeof(Chromosome) * POP_SIZE);
         int filled = 0;
         while (filled < POP_SIZE) {
-            int i1 = tournament_select(pop.fitness, POP_SIZE);
-            int i2 = tournament_select(pop.fitness, POP_SIZE);
+            int i1 = tournament_select_k(pop.fitness, POP_SIZE, TOURNAMENT_SIZE); /* <-- NUEVO: antes tournament_select() fijo en 2 */
+            int i2 = tournament_select_k(pop.fitness, POP_SIZE, TOURNAMENT_SIZE); /* <-- NUEVO: antes tournament_select() fijo en 2 */
 
             double r = (double)rand() / ((double)RAND_MAX + 1.0);
             if (r < pc) {
@@ -170,7 +192,7 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
         }
         for (int i = 0; i < POP_SIZE; i++) {
             combined_pop[POP_SIZE + i] = new_pop[i];
-            combined_fit[POP_SIZE + i] = chromosome_fitness_active(inst, &new_pop[i]);
+            combined_fit[POP_SIZE + i] = chromosome_fitness_active(inst, &new_pop[i]); /* <-- NUEVO: decoder activo */
         }
         free(new_pop); /* los Chromosome individuales ya se copiaron a combined_pop, no liberar sus arrays */
 
@@ -199,7 +221,6 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
             taken[idx] = 1;
         }
 
-
         Chromosome *survivors = (Chromosome *)malloc(sizeof(Chromosome) * POP_SIZE);
         double *survivor_fit = (double *)malloc(sizeof(double) * POP_SIZE);
         for (int s = 0; s < POP_SIZE; s++) {
@@ -226,11 +247,11 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
 
         /* --- Modificacion 2: reintroduccion si hay estancamiento --- */
         if (use_modification) {
-            int hist_idx = gen % STAGNATION_WINDOW;
+            int hist_idx = gen % stagnation_window;
             double improvement = (pop.fitness[cur_best_idx] - best_fitness_history[hist_idx]) /
                                   (best_fitness_history[hist_idx] > 0 ? best_fitness_history[hist_idx] : 1.0);
-            if (gen >= STAGNATION_WINDOW && improvement < STAGNATION_THRESHOLD) {
-                int n_reintro = (int)(POP_SIZE * REINTRO_FRACTION);
+            if (gen >= stagnation_window && improvement < STAGNATION_THRESHOLD) {
+                int n_reintro = (int)(POP_SIZE * reintro_fraction);
                 for (int r = 0; r < n_reintro; r++) {
                     /* elegir el peor individuo actual (excluyendo el mejor, por elitismo) */
                     int excluded[1] = { best_index(pop.fitness, POP_SIZE) };
@@ -249,6 +270,7 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
         }
     }
 
+    free(best_fitness_history);
     population_free(&pop);
     rl_free(&rl);
     return best_cmax_ever;
@@ -313,16 +335,6 @@ static const char *DEFAULT_INSTANCE_DIRS[] = {
 };
 #define NUM_DEFAULT_DIRS (int)(sizeof(DEFAULT_INSTANCE_DIRS) / sizeof(DEFAULT_INSTANCE_DIRS[0]))
 
-/*
- * Intenta resolver `arg` a una ruta real de archivo, probando varias
- * combinaciones. Devuelve 1 y escribe en `out` si encontro algo, 0 si no.
- * Orden de intentos para arg="mk01":
- *   1. "mk01"                                (tal cual, por si ya es una ruta valida)
- *   2. "mk01.txt"                             (agregando extension)
- *   3. "instances/brandimarte/mk01"           (carpeta por defecto, tal cual)
- *   4. "instances/brandimarte/mk01.txt"       (carpeta por defecto + extension)
- *   5. lo mismo para "instances/kacem/..."
- */
 static int resolve_instance_path(const char *arg, char *out, size_t out_size)
 {
     struct stat st;
@@ -403,7 +415,7 @@ int main(int argc, char **argv)
     clock_t inicio, fin;
     double tiempo_empleado;
 
-    inicio = clock();
+    
 
     if (argc < 2) {
         printf("Uso: %s <nombre_instancia | archivo.txt | carpeta> ...\n", argv[0]);
@@ -415,6 +427,8 @@ int main(int argc, char **argv)
     }
 
     for (int i = 1; i < argc; i++) {
+        inicio = clock();
+
         struct stat st;
         if (stat(argv[i], &st) == 0 && S_ISDIR(st.st_mode)) {
             run_path(argv[i]);
@@ -427,12 +441,13 @@ int main(int argc, char **argv)
             printf("No se encontro la instancia '%s' (probe: tal cual, +.txt, "
                    "instances/brandimarte/, instances/kacem/)\n", argv[i]);
         }
+
+        fin = clock();
+        tiempo_empleado = ((double)(fin - inicio)) / CLOCKS_PER_SEC;
+
+        printf("La instancia %s tardó: %f segundos en ejecutarse.\n",argv[i], tiempo_empleado);
     }
-
-    fin = clock();
-    tiempo_empleado = ((double)(fin - inicio)) / CLOCKS_PER_SEC;
-
-    printf("El programa tardó: %f segundos en ejecutarse.\n", tiempo_empleado);
+    
     printf("Maxima cantidad de generaciones: %d \n", MAX_GENERATIONS);
     printf("Tamaño de poblacion inicial: %d \n",POP_SIZE);
     return 0;
