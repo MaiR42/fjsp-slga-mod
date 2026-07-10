@@ -35,7 +35,7 @@
 
 //0,02 y 1,2
 #define STAGNATION_THRESHOLD 0.02   /* mejora relativa minima para no considerar estancado */
-#define ADAPTIVE_MUT_MAX_MULT 1.7   /* multiplicador maximo de Pm cuando diversidad es baja (FIJO) */
+#define ADAPTIVE_MUT_MAX_MULT 1.2   /* multiplicador maximo de Pm cuando diversidad es baja (FIJO) */
 
 
 
@@ -146,8 +146,8 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
         Chromosome *new_pop = (Chromosome *)malloc(sizeof(Chromosome) * POP_SIZE);
         int filled = 0;
         while (filled < POP_SIZE) {
-            int i1 = tournament_select_k(pop.fitness, POP_SIZE, TOURNAMENT_SIZE); /* <-- NUEVO: antes tournament_select() fijo en 2 */
-            int i2 = tournament_select_k(pop.fitness, POP_SIZE, TOURNAMENT_SIZE); /* <-- NUEVO: antes tournament_select() fijo en 2 */
+            int i1 = tournament_select_k(pop.fitness, POP_SIZE, TOURNAMENT_SIZE);
+            int i2 = tournament_select_k(pop.fitness, POP_SIZE, TOURNAMENT_SIZE);
 
             double r = (double)rand() / ((double)RAND_MAX + 1.0);
             if (r < pc) {
