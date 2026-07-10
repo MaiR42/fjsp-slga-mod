@@ -16,7 +16,7 @@
  * Implementa:
  *   - SLGA original (fiel al paper, con las asunciones documentadas en
  *     fjsp.h / ga.h / rl.h)
- *   - Version MODIFICADA con dos propuestas:
+ *   - Version MODIFICADA con las dos propuestas del usuario:
  *       (1) Mutacion adaptativa segun diversidad poblacional (usa d_star,
  *           Eq. 7, ya calculada en rl.c/rl.h)
  *       (2) Reintroduccion de individuos si no hay mejora significativa
@@ -27,18 +27,13 @@
 #define MAX_GENERATIONS 1500
 #define N_SEEDS 10
 
-#define TOURNAMENT_SIZE 2 // Para que sea torneo binario 
-
-// Parametros para la modificacion
-#define STAGNATION_WINDOW 50        /* K generaciones para juzgar estancamiento */
-#define STAGNATION_THRESHOLD 0.02  /* mejora relativa minima para NO considerar estancado */
-
-#define REINTRO_FRACTION 0.3       /* fraccion de la poblacion a reintroducir si hay estancamiento */
-// qitar el de arriba
-#define ADAPTIVE_MUT_MAX_MULT 1.2   /* multiplicador maximo de Pm cuando diversidad es baja */
+// Torneo binario
+#define TOURNAMENT_SIZE 2
 
 #define DIVERSITY_RESERVE_FRACTION 0.15
 
+#define STAGNATION_THRESHOLD 0.02   /* mejora relativa minima para NO considerar estancado */
+#define ADAPTIVE_MUT_MAX_MULT 1.2   /* multiplicador maximo de Pm cuando diversidad es baja (FIJO) */
 
 static int compute_dynamic_stagnation_window(int total_ops)
 {
@@ -177,11 +172,9 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
             }
         }
 
-        /* --- Seleccion/Reemplazo: "elite retention strategy" (confirmado
-         * textualmente en el paper, Sec 3.1.4): se combina la poblacion
-         * anterior completa + toda la descendencia nueva, y se conservan
-         * los N individuos con mayor fitness del conjunto combinado
-         * (se descartan los peores, sin importar si son padres o hijos). */
+        /* --- Seleccion/Reemplazo: "elite retention strategy" + elitismo suavizado: se
+         * reserva una fraccion de posiciones para diversidad (sobrevivientes
+         * al azar), en vez de quedarse siempre con los N mejores estrictos. */
         int combined_size = POP_SIZE * 2;
         Chromosome *combined_pop = (Chromosome *)malloc(sizeof(Chromosome) * combined_size);
         double *combined_fit = (double *)malloc(sizeof(double) * combined_size);
@@ -192,12 +185,10 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
         }
         for (int i = 0; i < POP_SIZE; i++) {
             combined_pop[POP_SIZE + i] = new_pop[i];
-            combined_fit[POP_SIZE + i] = chromosome_fitness_active(inst, &new_pop[i]); /* <-- NUEVO: decoder activo */
+            combined_fit[POP_SIZE + i] = chromosome_fitness_active(inst, &new_pop[i]);
         }
         free(new_pop); /* los Chromosome individuales ya se copiaron a combined_pop, no liberar sus arrays */
 
-        /* Seleccion de los mejores POP_SIZE (O(n^2), suficiente para pop_size chico) */
-        // Nuevo, elitismo suavizado
         int strict_count = (int)(POP_SIZE * (1.0 - DIVERSITY_RESERVE_FRACTION));
         int *selected = (int *)malloc(sizeof(int) * POP_SIZE);
         int *taken = (int *)calloc(combined_size, sizeof(int));
@@ -287,7 +278,7 @@ static void run_benchmark(const char *filepath, const char *label)
     printf("=== %s (%s) ===\n", label, filepath);
 
     int n_seeds = N_SEEDS;
-    int baseline_results[n_seeds], modified_results[n_seeds];
+    int baseline_results[N_SEEDS], modified_results[N_SEEDS];
 
     for (int s = 0; s < n_seeds; s++) {
         unsigned int seed = 1000 + s;
@@ -327,7 +318,6 @@ static int compare_strings(const void *a, const void *b)
 {
     return strcmp(*(const char **)a, *(const char **)b);
 }
-
 
 static const char *DEFAULT_INSTANCE_DIRS[] = {
     "instances/brandimarte",
@@ -379,8 +369,6 @@ static void run_path(const char *path)
             printf("No se pudo leer el directorio '%s'\n", path);
             return;
         }
-
-        /* juntar nombres de archivos .txt */
         char **names = NULL;
         int count = 0, capacity = 0;
         struct dirent *entry;
@@ -395,7 +383,6 @@ static void run_path(const char *path)
         }
         closedir(dir);
 
-        /* orden alfabetico para resultados reproducibles */
         qsort(names, count, sizeof(char *), compare_strings);
 
         for (int i = 0; i < count; i++) {
@@ -445,10 +432,10 @@ int main(int argc, char **argv)
         fin = clock();
         tiempo_empleado = ((double)(fin - inicio)) / CLOCKS_PER_SEC;
 
-        printf("La instancia %s tardó: %f segundos en ejecutarse.\n",argv[i], tiempo_empleado);
+        printf("El programa tardó: %f segundos en ejecutarse.\n", tiempo_empleado);
     }
-    
+
     printf("Maxima cantidad de generaciones: %d \n", MAX_GENERATIONS);
-    printf("Tamaño de poblacion inicial: %d \n",POP_SIZE);
+    printf("Tamaño de poblacion inicial: %d \n", POP_SIZE);
     return 0;
 }
