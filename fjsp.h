@@ -2,7 +2,6 @@
 #define FJSP_H
 
 // ============================ Parser ============================
-
 /*
  * Estructuras de datos para una instancia de FJSP, y parser del formato
  * .txt usado por los benchmarks de Brandimarte y Kacem (verificado
@@ -23,24 +22,22 @@ typedef struct {
 
 typedef struct {
     int num_options;
-    MachineOption *options;   /* array de tamano num_options */
+    MachineOption *options;   /* maquinas que pueden realizar la operacion, array de tamaño num_options */
 } Operation;
 
 typedef struct {
     int num_operations;
-    Operation *operations;    /* array de tamano num_operations */
+    Operation *operations;    /* array de tamaño num_operations */
 } Job;
 
 typedef struct {
     int num_jobs;
     int num_machines;
-    Job *jobs;                 /* array de tamano num_jobs */
+    Job *jobs;                 /* array de tamaño num_jobs */
 } FJSPInstance;
 
 int fjsp_load_from_file(const char *path, FJSPInstance *inst);
-
 void fjsp_free(FJSPInstance *inst);
-
 void fjsp_print(const FJSPInstance *inst); // DEGUB
 
 // ============================ Cromosoma (encoding OS + MS, Sec 3.1.1) ============================ 
@@ -50,9 +47,8 @@ void fjsp_print(const FJSPInstance *inst); // DEGUB
  * aparece el job j en el array (leyendo de izquierda a derecha) representa
  * la operacion O_{j,k}.
  *
- * ms[i] (Machine Assignment): id de MAQUINA REAL (0-indexada, ej. "3" =
- * M3), emparejada por POSICION con os[i] (confirmado con Fig. 1 del paper:
- * misma posicion = misma operacion en ambos arrays).
+ * ms[i] (Machine Assignment): id de MAQUINA REAL (0-indexada),
+ * emparejada por POSICION con os[i]
  *
  * length = total de operaciones en toda la instancia = len(os) = len(ms).
  */
@@ -93,8 +89,6 @@ void chromosome_print(const Chromosome *c); // DEGUB
 
 // Para el decoder semi-activo
 int decode_makespan(const FJSPInstance *inst, const Chromosome *c);
-
-/* fitness = 1 / Cmax */
 double chromosome_fitness(const FJSPInstance *inst, const Chromosome *c);
 
 // Para el decoder activo
