@@ -447,5 +447,10 @@ int main(int argc, char **argv)
     // Imprimir algunos parametros
     printf("Maxima cantidad de generaciones: %d \n", MAX_GENERATIONS);
     printf("Tamaño de poblacion inicial: %d \n", POP_SIZE);
+
+    printf("Numero de seeds/iteraciones %d \n", N_SEEDS);
+    printf("Porcentaje de reserva de poblacion (DIVERSITY_RESERVE_FRACTION) %f%% \n", DIVERSITY_RESERVE_FRACTION*100);
+    printf("Umbral de estancamiento %f \n", STAGNATION_THRESHOLD);
+    printf("Multiplicador de mutacion maximo %f \n", ADAPTIVE_MUT_MAX_MULT);
     return 0;
 }
