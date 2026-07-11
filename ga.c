@@ -9,6 +9,8 @@ int tournament_select(const double *fitness, int pop_size)
     return tournament_select_k(fitness, pop_size, 2);
 }
 
+
+// Utilizado con k = 2 (torneo binario)
 int tournament_select_k(const double *fitness, int pop_size, int k)
 {
     int best = rand() % pop_size;
@@ -34,7 +36,7 @@ static void pox_build_child(const int *in_j1, int num_jobs, int keep_is_j1, cons
         int keep = keep_is_j1 ? job_in_j1 : !job_in_j1;
         if (keep) {
             child->os[i] = job;
-            child->ms[i] = keep_parent->ms[i]; /* <-- NUEVO: MS acoplado (antes: cruce de 2 puntos aparte) */
+            child->ms[i] = keep_parent->ms[i];
         } else {
             child->os[i] = -1; /* -1 = vacante, se llena despues */
         }
@@ -49,7 +51,7 @@ static void pox_build_child(const int *in_j1, int num_jobs, int keep_is_j1, cons
             int should_fill = keep_is_j1 ? !job_in_j1 : job_in_j1; /* complemento */
             if (should_fill) {
                 child->os[i] = job;
-                child->ms[i] = fill_parent->ms[idx]; /* <-- NUEVO: MS acoplado (antes: cruce de 2 puntos aparte) */
+                child->ms[i] = fill_parent->ms[idx];
                 idx++;
                 break;
             }
