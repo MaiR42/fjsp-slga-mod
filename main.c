@@ -1,5 +1,4 @@
 #define _POSIX_C_SOURCE 200809L
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,19 +22,18 @@
  *           en las ultimas K generaciones
  */
 
-#define POP_SIZE 30
-#define MAX_GENERATIONS 3000
+// ============================ Parametros ============================
+#define POP_SIZE 30 // Tamaño de la poblacion
+#define MAX_GENERATIONS 3000 // Maximo de generaciones/iteraciones
 
-#define N_SEEDS 10
+#define N_SEEDS 10 // Cantidad de veces que se repite la ejecucion, con distintas seeds. Para obtener ASL
 
-// Torneo binario
-#define TOURNAMENT_SIZE 2
+#define TOURNAMENT_SIZE 2 // Definir en 2 para torneo binario
 
-#define DIVERSITY_RESERVE_FRACTION 0.15
+#define DIVERSITY_RESERVE_FRACTION 0.15 // Porcentaje de la poblacion (individuos aleatorios) que se mantiene en la siguiente generacion 
 
-//0,02 y 1,2
-#define STAGNATION_THRESHOLD 0.02   /* mejora relativa minima para no considerar estancado */
-#define ADAPTIVE_MUT_MAX_MULT 1.2   /* multiplicador maximo de Pm cuando diversidad es baja (FIJO) */
+#define STAGNATION_THRESHOLD 0.02   // Mejora relativa minima para no considerar estancamiento
+#define ADAPTIVE_MUT_MAX_MULT 1.2   // Multiplicador maximo de Pm cuando diversidad es baja
 
 
 
@@ -85,14 +83,14 @@ static void population_free(Population *p)
     free(p->fitness);
 }
 
-static int best_index(const double *fitness, int n)
+static int best_index(const double *fitness, int n) // Indice del mejor fitness
 {
     int best = 0;
     for (int i = 1; i < n; i++) if (fitness[i] > fitness[best]) best = i;
     return best;
 }
 
-static int worst_index_excluding(const double *fitness, int n, const int *excluded, int n_excluded)
+static int worst_index_excluding(const double *fitness, int n, const int *excluded, int n_excluded) // Indice del peor fitness
 {
     int worst = -1;
     for (int i = 0; i < n; i++) {
@@ -106,7 +104,7 @@ static int worst_index_excluding(const double *fitness, int n, const int *exclud
 
 /*
  * Ejecuta SLGA sobre una instancia. use_modification activa las dos
- * mejoras propuestas por el usuario. Devuelve el mejor Cmax encontrado.
+ * mejoras propuestas. Devuelve el mejor Cmax encontrado.
  */
 static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed, int verbose)
 {
@@ -130,7 +128,7 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
         double pc, pm;
         rl_step(&rl, pop.fitness, &pc, &pm);
 
-        /* --- Modificacion 1: mutacion adaptativa por diversidad --- */
+        /* --- Modificacion 1: mutacion adaptativa en base a diversidad --- */
         double pm_effective = pm;
         if (use_modification) {
             double d_star = compute_d_star(pop.fitness, rl.fit_gen1, POP_SIZE);
@@ -142,14 +140,16 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
             if (pm_effective > 1.0) pm_effective = 1.0;
         }
 
-        /* --- Generar nueva poblacion via seleccion + cruce + mutacion --- */
+        /* --- Generar nueva poblacion via: seleccion + cruce + mutacion --- */
         Chromosome *new_pop = (Chromosome *)malloc(sizeof(Chromosome) * POP_SIZE);
         int filled = 0;
         while (filled < POP_SIZE) {
+            // Elegir padres para cruce
             int i1 = tournament_select_k(pop.fitness, POP_SIZE, TOURNAMENT_SIZE);
             int i2 = tournament_select_k(pop.fitness, POP_SIZE, TOURNAMENT_SIZE);
 
             double r = (double)rand() / ((double)RAND_MAX + 1.0);
+            // Cruce (con posible mutacion)
             if (r < pc) {
                 Chromosome c1, c2;
                 crossover(inst, &pop.pop[i1], &pop.pop[i2], &c1, &c2);
@@ -162,7 +162,7 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
                     chromosome_free(&c2);
                 }
             } else {
-                /* sin cruce: copiar padres directamente (con posible mutacion) */
+                // Sin cruce: copiar padres directamente (con posible mutacion)
                 Chromosome c1, c2;
                 chromosome_init(&c1, pop.pop[i1].length);
                 chromosome_init(&c2, pop.pop[i2].length);
@@ -262,7 +262,7 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
         }
 
         if (verbose && (gen % 20 == 0 || gen == MAX_GENERATIONS - 1)) {
-            printf("  gen %3d: best Cmax so far = %d\n", gen, best_cmax_ever);
+            printf("  gen %3d: best Cmax so far = %d\n", gen, best_cmax_ever); // DEBUG
         }
     }
 
@@ -283,14 +283,26 @@ static void run_benchmark(const char *filepath, const char *label)
     printf("=== %s (%s) ===\n", label, filepath);
 
     int n_seeds = N_SEEDS;
-    int baseline_results[N_SEEDS], modified_results[N_SEEDS];
+    int baseline_results[N_SEEDS], modified_results[N_SEEDS]; // Misma cantidad de iteraciones para solucion original y modificada
+
+    clock_t inicio, fin;
+    double time_baseline = 0, time_modified = 0;
 
     for (int s = 0; s < n_seeds; s++) {
         unsigned int seed = 1000 + s;
+
+        inicio = clock();
         baseline_results[s] = run_slga(&inst, 0, seed, 0);
+        fin = clock();
+        time_baseline += ((double)(fin - inicio)) / CLOCKS_PER_SEC;
+
+        inicio = clock();
         modified_results[s] = run_slga(&inst, 1, seed, 0);
+        fin = clock();
+        time_modified += ((double)(fin - inicio)) / CLOCKS_PER_SEC;
     }
 
+    // Obtener BSL y ASL
     double base_avg = 0, mod_avg = 0;
     int base_best = baseline_results[0], mod_best = modified_results[0];
     for (int s = 0; s < n_seeds; s++) {
@@ -307,6 +319,9 @@ static void run_benchmark(const char *filepath, const char *label)
     double improvement_pct = 100.0 * (base_avg - mod_avg) / base_avg;
     printf("  Diferencia promedio: %.2f%% %s\n\n", improvement_pct >= 0 ? improvement_pct : -improvement_pct,
            improvement_pct >= 0 ? "(modificado mejor)" : "(modificado peor)");
+
+    printf("  Tiempo SLGA original : %f segundos (%d corridas)\n", time_baseline, n_seeds);
+    printf("  Tiempo SLGA modificado: %f segundos (%d corridas)\n\n", time_modified, n_seeds);
 
     fjsp_free(&inst);
 }
@@ -402,13 +417,9 @@ static void run_path(const char *path)
     }
 }
 
+
 int main(int argc, char **argv)
 {
-    clock_t inicio, fin;
-    double tiempo_empleado;
-
-    
-
     if (argc < 2) {
         printf("Uso: %s <nombre_instancia | archivo.txt | carpeta> ...\n", argv[0]);
         printf("Ej:  %s mk01                    (busca en instances/brandimarte/mk01.txt)\n", argv[0]);
@@ -419,8 +430,6 @@ int main(int argc, char **argv)
     }
 
     for (int i = 1; i < argc; i++) {
-        inicio = clock();
-
         struct stat st;
         if (stat(argv[i], &st) == 0 && S_ISDIR(st.st_mode)) {
             run_path(argv[i]);
@@ -433,13 +442,9 @@ int main(int argc, char **argv)
             printf("No se encontro la instancia '%s' (probe: tal cual, +.txt, "
                    "instances/brandimarte/, instances/kacem/)\n", argv[i]);
         }
-
-        fin = clock();
-        tiempo_empleado = ((double)(fin - inicio)) / CLOCKS_PER_SEC;
-
-        printf("El programa tardó: %f segundos en ejecutarse.\n", tiempo_empleado);
     }
 
+    // Imprimir algunos parametros
     printf("Maxima cantidad de generaciones: %d \n", MAX_GENERATIONS);
     printf("Tamaño de poblacion inicial: %d \n", POP_SIZE);
     return 0;
