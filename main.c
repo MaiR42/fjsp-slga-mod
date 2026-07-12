@@ -41,8 +41,7 @@
 static int compute_dynamic_stagnation_window(int total_ops)
 {
     int w = 30 + total_ops / 3;
-    if (w < 20) w = 20;
-    if (w > 150) w = 150;
+    if (w > 150) w = 150; // Tope temporal (para que ventana no sea exagerada o que sobrepase el MAX_GENERATIONS). Ajustado a operaciones de Brandimarte
     return w;
 }
 
