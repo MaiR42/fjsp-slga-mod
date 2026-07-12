@@ -41,7 +41,7 @@
 static int compute_dynamic_stagnation_window(int total_ops)
 {
     int w = 30 + total_ops / 3;
-    if (w > 150) w = 150; // Tope temporal (para que ventana no sea exagerada o que sobrepase el MAX_GENERATIONS). Ajustado a operaciones de Brandimarte
+    //if (w > 150) w = 150; // Tope temporal (para que ventana no sea exagerada o que sobrepase el MAX_GENERATIONS). Ajustado a operaciones de Brandimarte
     return w;
 }
 
@@ -275,7 +275,7 @@ static void run_benchmark(const char *filepath, const char *label)
 {
     FJSPInstance inst;
     if (fjsp_load_from_file(filepath, &inst) != 0) {
-        printf("No se pudo cargar %s\n", filepath);
+        printf("No se pudo cargar %s\n", filepath); // DEBUG
         return;
     }
 
@@ -352,21 +352,21 @@ static int resolve_instance_path(const char *arg, char *out, size_t out_size)
 
     /* 1. tal cual */
     if (stat(arg, &st) == 0) {
-        snprintf(out, out_size, "%s", arg);
+        snprintf(out, out_size, "%s", arg); // DEBUG
         return 1;
     }
     /* 2. agregando .txt */
     if (!already_has_txt) {
-        snprintf(out, out_size, "%s.txt", arg);
+        snprintf(out, out_size, "%s.txt", arg); // DEBUG
         if (stat(out, &st) == 0) return 1;
     }
     /* 3-4-5-6: carpetas por defecto, con y sin .txt */
     for (int d = 0; d < NUM_DEFAULT_DIRS; d++) {
-        snprintf(out, out_size, "%s/%s", DEFAULT_INSTANCE_DIRS[d], arg);
+        snprintf(out, out_size, "%s/%s", DEFAULT_INSTANCE_DIRS[d], arg); // DEBUG
         if (stat(out, &st) == 0) return 1;
 
         if (!already_has_txt) {
-            snprintf(out, out_size, "%s/%s.txt", DEFAULT_INSTANCE_DIRS[d], arg);
+            snprintf(out, out_size, "%s/%s.txt", DEFAULT_INSTANCE_DIRS[d], arg); // DEBUG
             if (stat(out, &st) == 0) return 1;
         }
     }
@@ -378,14 +378,14 @@ static void run_path(const char *path)
 {
     struct stat st;
     if (stat(path, &st) != 0) {
-        printf("No se pudo acceder a '%s'\n", path);
+        printf("No se pudo acceder a '%s'\n", path); // DEBUG
         return;
     }
 
     if (S_ISDIR(st.st_mode)) {
         DIR *dir = opendir(path);
         if (!dir) {
-            printf("No se pudo leer el directorio '%s'\n", path);
+            printf("No se pudo leer el directorio '%s'\n", path); // DEBUG
             return;
         }
         char **names = NULL;
@@ -406,7 +406,7 @@ static void run_path(const char *path)
 
         for (int i = 0; i < count; i++) {
             char fullpath[1024];
-            snprintf(fullpath, sizeof(fullpath), "%s/%s", path, names[i]);
+            snprintf(fullpath, sizeof(fullpath), "%s/%s", path, names[i]); // DEBUG
             run_benchmark(fullpath, names[i]);
             free(names[i]);
         }
@@ -419,15 +419,6 @@ static void run_path(const char *path)
 
 int main(int argc, char **argv)
 {
-    if (argc < 2) {
-        printf("Uso: %s <nombre_instancia | archivo.txt | carpeta> ...\n", argv[0]);
-        printf("Ej:  %s mk01                    (busca en instances/brandimarte/mk01.txt)\n", argv[0]);
-        printf("Ej:  %s mk01 mk02 k1             (varias instancias por nombre)\n", argv[0]);
-        printf("Ej:  %s instances/brandimarte    (corre TODAS las .txt de la carpeta)\n", argv[0]);
-        printf("Ej:  %s k1.txt mk01.txt          (rutas completas, como antes)\n", argv[0]);
-        return 1;
-    }
-
     for (int i = 1; i < argc; i++) {
         struct stat st;
         if (stat(argv[i], &st) == 0 && S_ISDIR(st.st_mode)) {
