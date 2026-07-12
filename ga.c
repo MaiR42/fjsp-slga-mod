@@ -177,7 +177,7 @@ long repair_get_total_genes_checked(void) { return g_repair_total_checked; }
 long repair_get_total_genes_repaired(void) { return g_repair_total_repaired; }
 void repair_reset_counters(void) { g_repair_total_checked = 0; g_repair_total_repaired = 0; }
 
-// Experimental DEBUG
+// Experimental // No aplicado
 // No se especifica como se aplica la mutacion, por lo que hay 2 modulos relacionados (mutate y mutate_once_per_chromosome)
 void mutate_once_per_chromosome(const FJSPInstance *inst, Chromosome *c, double pm)
 {

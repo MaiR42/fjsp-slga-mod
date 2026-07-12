@@ -3,30 +3,6 @@
 
 #include "fjsp.h"
 
-
-/*
- * NOTA: estos operadores son una implementacion PRAGMATICA de lo descrito/inferido del paper:
- *   - Cruce OS+MS: POX (Precedence Operation Crossover) con MS heredado
- *     ACOPLADO al mismo mecanismo (ver nota detallada en pox_build_child,
- *     ga.c). El paper describe el cruce de MS como "dos puntos"
- *     independiente del OS (Fig. 7, Zhang et al. 2011), pero eso genera
- *     inconsistencias posicionales tras el reordenamiento de POX (medido
- *     empiricamente: hasta ~40% de los genes MS heredados se perdian en
- *     reparacion aleatoria). La version acoplada implementada aca es una
- *     mejora practica sobre lo que describe el paper, no una desviacion
- *     por descuido: elimina la perdida de informacion genetica sin
- *     cambiar el comportamiento en instancias donde nunca se necesitaba
- *     reparar (ej. Kacem, flexibilidad total).
- *   - Mutacion: swap en OS (confirmado, Lei 2012), swap validity-preserving
- *     en MS (confirmado, Lei 2012)
- *   - Seleccion: torneo binario para elegir padres (no confirmado del paper)
- *   - Reemplazo: elite retention strategy (confirmado, Sec 3.1.4)
- *
- * repair_chromosome() se conserva como red de seguridad para casos borde,
- * pero con el cruce acoplado ya no destruye informacion genetica en el
- * caso normal (medido: 0% de reparaciones tras el cambio)
- */
-
 /* Seleccion por torneo binario: elige 2 individuos al azar de la poblacion
  * y devuelve el indice del que tiene mayor fitness. */
 int tournament_select(const double *fitness, int pop_size);
@@ -52,7 +28,7 @@ void repair_reset_counters(void);
  * gen). Si ocurre, hace UN swap en OS y UN intento de swap Lei-MS.
  * Para comparar contra mutate() (Pm por gen)
  */
-// Experimental
+// Experimental // No aplicado
 void mutate_once_per_chromosome(const FJSPInstance *inst, Chromosome *c, double pm);
 
 #endif /* GA_H */
