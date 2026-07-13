@@ -82,8 +82,9 @@ make
 ## Usage
 
 ```bash
-./slga mk01
-./slga instances/brandimarte
+./slga_mod mk01
+./slga_mod mk01 mk02 mk03
+./slga_mod instances/brandimarte
 ```
 ## Documented Assumptions
 
