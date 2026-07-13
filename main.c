@@ -45,14 +45,15 @@ static int compute_dynamic_stagnation_window(int total_ops)
     return w;
 }
 
-static double compute_dynamic_reintro_fraction(int total_ops)
+// Experimental, no aplicada
+static double compute_dynamic_reintro_fraction(int total_ops) // BUG, No funciona correctamente con el valor previo base (0.03). Al tener POP_SIZE = 30 la cantidad de individuos reintroducidos era cero siempre.
 {
     double base = 0.03;
     double scale = 100.0 / (double)total_ops;
     if (scale > 1.0) scale = 1.0;
     double frac = base * scale;
     if (frac < 0.01) frac = 0.01;
-    return frac;
+    return frac; // return frac; 
 }
 
 typedef struct {
@@ -241,6 +242,8 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
         if (cur_cmax < best_cmax_ever) best_cmax_ever = cur_cmax;
 
         /* --- Modificacion 2: reintroduccion si hay estancamiento --- */
+        // Experimental, no utilizada
+        /*
         if (use_modification) {
             int hist_idx = gen % stagnation_window;
             double improvement = (pop.fitness[cur_best_idx] - best_fitness_history[hist_idx]) /
@@ -248,7 +251,7 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
             if (gen >= stagnation_window && improvement < STAGNATION_THRESHOLD) {
                 int n_reintro = (int)(POP_SIZE * reintro_fraction);
                 for (int r = 0; r < n_reintro; r++) {
-                    /* elegir el peor individuo actual (excluyendo el mejor, por elitismo) */
+                    // elegir el peor individuo actual (excluyendo el mejor, por elitismo)
                     int excluded[1] = { best_index(pop.fitness, POP_SIZE) };
                     int worst = worst_index_excluding(pop.fitness, POP_SIZE, excluded, 1);
                     if (worst == -1) break;
@@ -257,9 +260,10 @@ static int run_slga(FJSPInstance *inst, int use_modification, unsigned int seed,
                     pop.fitness[worst] = chromosome_fitness_active(inst, &pop.pop[worst]);
                 }
             }
+            
             best_fitness_history[hist_idx] = pop.fitness[cur_best_idx];
         }
-
+        */
         if (verbose && (gen % 20 == 0 || gen == MAX_GENERATIONS - 1)) {
             printf("  gen %3d: best Cmax so far = %d\n", gen, best_cmax_ever); // DEBUG
         }
