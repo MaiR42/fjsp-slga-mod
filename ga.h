@@ -3,9 +3,9 @@
 
 #include "fjsp.h"
 
-/* Seleccion por torneo binario: elige 2 individuos al azar de la poblacion
- * y devuelve el indice del que tiene mayor fitness. */
-int tournament_select(const double *fitness, int pop_size);
+/* Seleccion por torneo binario: elige 2 individuos al azar de la poblacion */
+int tournament_select(const double *fitness, int pop_size); // Reempleazado por el de abajo
+/* Incluido para experimentar, usado con k = 2 */
 int tournament_select_k(const double *fitness, int pop_size, int k);
 /*
  * Cruce OS (POX) + cruce MS (dos puntos), combinados. p1, p2 son los padres;
@@ -16,7 +16,8 @@ void crossover(const FJSPInstance *inst, const Chromosome *p1, const Chromosome 
 /* Mutacion in-place: con probabilidad pm, aplica swap en OS y/o reasignacion en MS */
 void mutate(const FJSPInstance *inst, Chromosome *c, double pm);
 
-/* Corrige genes de MS invalidos (ver nota de arriba). Se llama despues de crossover/mutate. */
+/* Corrige genes de MS invalidos. Se llama despues de crossover/mutate. */
+/* Principalmente era por errores en la instancia de Brandimarte */
 void repair_chromosome(const FJSPInstance *inst, Chromosome *c);
 
 long repair_get_total_genes_checked(void);
@@ -28,7 +29,7 @@ void repair_reset_counters(void);
  * gen). Si ocurre, hace UN swap en OS y UN intento de swap Lei-MS.
  * Para comparar contra mutate() (Pm por gen)
  */
-// Experimental // No aplicado
+/* Experimental, no utilizado*/ 
 void mutate_once_per_chromosome(const FJSPInstance *inst, Chromosome *c, double pm);
 
 #endif /* GA_H */
